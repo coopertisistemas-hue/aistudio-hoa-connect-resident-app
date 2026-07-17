@@ -1,0 +1,22 @@
+export const currentConsumption = {
+  month: 'Julho 2026',
+  consumption: 22,
+  unit: 'm³',
+  previousConsumption: 19,
+  previousMonth: 'Junho 2026',
+  variation: 3,
+  variationPercent: 15.8,
+  trend: 'up',
+  averageDaily: 0.73,
+  history: [
+    { month: 'Jan', consumption: 18 },
+    { month: 'Fev', consumption: 20 },
+    { month: 'Mar', consumption: 19 },
+    { month: 'Abr', consumption: 17 },
+    { month: 'Mai', consumption: 21 },
+    { month: 'Jun', consumption: 19 },
+    { month: 'Jul', consumption: 22 },
+  ],
+  readingDate: '2026-07-15',
+  nextReadingEstimate: '2026-08-15',
+};

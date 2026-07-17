@@ -1,3 +1,141 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  --background-50: 0.97 0.005 90;
+  --background-100: 0.94 0.008 88;
+  --background-200: 0.89 0.010 85;
+  --background-300: 0.83 0.012 83;
+  --background-400: 0.75 0.014 82;
+  --background-500: 0.68 0.016 80;
+  --background-600: 0.60 0.018 78;
+  --background-700: 0.52 0.017 76;
+  --background-800: 0.43 0.016 74;
+  --background-900: 0.35 0.015 72;
+  --background-950: 0.26 0.014 70;
+
+  --primary-50: 0.95 0.025 185;
+  --primary-100: 0.88 0.045 187;
+  --primary-200: 0.78 0.060 190;
+  --primary-300: 0.68 0.070 192;
+  --primary-400: 0.58 0.078 194;
+  --primary-500: 0.48 0.080 196;
+  --primary-600: 0.42 0.075 197;
+  --primary-700: 0.36 0.068 198;
+  --primary-800: 0.30 0.058 199;
+  --primary-900: 0.24 0.045 200;
+  --primary-950: 0.18 0.032 201;
+
+  --accent-50: 0.94 0.018 220;
+  --accent-100: 0.86 0.035 225;
+  --accent-200: 0.76 0.050 230;
+  --accent-300: 0.66 0.065 235;
+  --accent-400: 0.56 0.078 238;
+  --accent-500: 0.48 0.082 240;
+  --accent-600: 0.42 0.075 241;
+  --accent-700: 0.36 0.065 242;
+  --accent-800: 0.30 0.052 243;
+  --accent-900: 0.24 0.038 244;
+  --accent-950: 0.18 0.025 245;
+
+  --secondary-50: 0.95 0.010 80;
+  --secondary-100: 0.88 0.018 82;
+  --secondary-200: 0.78 0.025 84;
+  --secondary-300: 0.68 0.030 85;
+  --secondary-400: 0.58 0.032 86;
+  --secondary-500: 0.48 0.035 87;
+  --secondary-600: 0.42 0.032 87;
+  --secondary-700: 0.36 0.028 88;
+  --secondary-800: 0.30 0.022 88;
+  --secondary-900: 0.24 0.016 89;
+  --secondary-950: 0.18 0.010 90;
+
+  --foreground-50: 0.92 0.005 260;
+  --foreground-100: 0.84 0.008 262;
+  --foreground-200: 0.72 0.012 264;
+  --foreground-300: 0.60 0.015 266;
+  --foreground-400: 0.48 0.016 268;
+  --foreground-500: 0.38 0.015 270;
+  --foreground-600: 0.32 0.013 272;
+  --foreground-700: 0.26 0.010 274;
+  --foreground-800: 0.20 0.008 276;
+  --foreground-900: 0.14 0.006 278;
+  --foreground-950: 0.08 0.004 280;
+
+  --font-heading: 'Inter', sans-serif;
+  --font-body: 'Inter', sans-serif;
+  --font-label: 'Inter', sans-serif;
+
+  --color-error: #dc2626;
+  --color-success: #16a34a;
+  --color-warning: #d97706;
+  --color-info: #0d6b6e;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html {
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background-color: oklch(var(--background-50));
+  color: oklch(var(--foreground-900));
+}
+
+input, textarea, select, button {
+  font-family: inherit;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Honeypot field - hidden from real users but detectable by bots */
+.hp-field {
+  position: absolute;
+  left: -9999px;
+  opacity: 0;
+  height: 0;
+  width: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* Safe area padding for mobile */
+.safe-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Smooth page transitions */
+.page-enter {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+.page-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 200ms ease-out, transform 200ms ease-out;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 0px;
+  background: transparent;
+}
