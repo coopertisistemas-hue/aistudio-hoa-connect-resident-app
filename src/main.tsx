@@ -9,3 +9,12 @@ createRoot(document.getElementById('root')!).render(
     <App />
   </StrictMode>,
 )
+
+// Register Service Worker only in production builds.
+// In development, an active SW can cause stale cached assets.
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  navigator.serviceWorker.register('/sw.js').catch(() => {
+    // Registration failure must not crash the application.
+    // Service Worker is a progressive enhancement for offline shell support.
+  });
+}

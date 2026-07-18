@@ -30,7 +30,7 @@ const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(function Checkbox({
             disabled={disabled}
             {...props}
           />
-          <div className="w-5 h-5 rounded-md border-2 border-background-300 bg-background-50 flex items-center justify-center transition-all peer-checked:bg-primary-500 peer-checked:border-primary-500 peer-focus-visible:ring-2 peer-focus-visible:ring-primary-200 peer-focus-visible:ring-offset-2">
+          <div className="w-5 h-5 rounded-md border-2 border-background-300 bg-background-50 flex items-center justify-center transition-all peer-checked:bg-primary-500 peer-checked:border-primary-500 peer-focus-visible:ring-2 peer-focus-visible:ring-primary-200 peer-focus-visible:ring-offset-2" aria-hidden="true">
             <i className="ri-check-line text-white text-xs opacity-0 peer-checked:opacity-100 transition-opacity" />
           </div>
         </div>

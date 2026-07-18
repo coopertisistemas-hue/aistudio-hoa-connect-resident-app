@@ -1,0 +1,39 @@
+{
+  "name": "HOA Connect — App do Morador",
+  "short_name": "HOA Connect",
+  "description": "Aplicativo para moradores de associações e condomínios. Acesse faturas, consumo de água, avisos e fale com sua associação.",
+  "lang": "pt-BR",
+  "start_url": "/welcome",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f8fafb",
+  "theme_color": "#0d6b6e",
+  "categories": ["utilities", "lifestyle"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/icon-maskable-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}
