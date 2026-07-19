@@ -174,6 +174,8 @@ New risks added:
 
 **Support-messages Wave B evidence on July 19, 2026:** see [15-realtime-option-b-validation-report.md](15-realtime-option-b-validation-report.md).
 
+**Sprint 1 foundation follow-on on July 19, 2026:** see [17-sprint-01-foundation-identity-report.md](17-sprint-01-foundation-identity-report.md).
+
 ---
 
 *Report produced: 2026-07-18; superseded by validation report on 2026-07-19*  

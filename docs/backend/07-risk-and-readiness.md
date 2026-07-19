@@ -216,6 +216,14 @@ application with SaaS-shaped tables. Criterion 5 is the one the program brief op
 
 ## 6. What could still go wrong that this plan does not fully solve
 
+### Sprint 1 residual validation gaps as of July 19, 2026
+
+| ID | Gap | Severity | Current handling |
+|---|---|---|---|
+| S1-01 | Edge Function authorization paths are implemented but not yet covered by executable function-level tests in this repository | Medium | Keep Sprint 2 rollout blocked on function execution tests and hosted dry run |
+| S1-02 | Generated database types exist, but repository-wide `pnpm run typecheck` was blocked by package-manager install approval state (`ERR_PNPM_IGNORED_BUILDS`) rather than by a contract compile error | Medium | Treat as environment verification debt; resolve package-manager state before certification upgrade |
+| S1-03 | Sprint 1 local schema is validated only in the disposable local Supabase stack and is not deployed to any hosted environment | Low | Intended; no production touch in this wave |
+
 Stated plainly, because a risk register that projects total confidence is not useful:
 
 - **The frontend types may encode assumptions the real data violates.** The fixtures were authored

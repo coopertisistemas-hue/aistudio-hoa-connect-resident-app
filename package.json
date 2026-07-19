@@ -8,7 +8,14 @@
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "type-check": "tsc --noEmit --project tsconfig.app.json"
+    "type-check": "tsc --noEmit --project tsconfig.app.json",
+    "supabase:start": "supabase start",
+    "supabase:stop": "supabase stop",
+    "supabase:reset": "supabase db reset",
+    "supabase:test:sprint1": "bash -lc 'docker exec -i supabase_db_aistudio-hoa-connect-resident-app psql -U postgres -d postgres < supabase/tests/sprint01_foundation.sql'",
+    "supabase:test:d2": "bash validation/run_d2_regression.sh",
+    "supabase:test:all": "npm run supabase:test:sprint1 && npm run supabase:test:d2",
+    "supabase:types": "supabase gen types typescript --local > src/lib/supabase/database.types.ts"
   },
   "dependencies": {
     "i18next": "^25.3.2",
