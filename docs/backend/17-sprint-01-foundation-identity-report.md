@@ -393,14 +393,38 @@ Reason:
 
 ---
 
-## 12. Next gate
+## 13. Conditions Closure — July 19, 2026
 
-Sprint 2 may proceed only under the explicit condition that the remaining Sprint 1 verification debt is carried as a tracked gate:
+The three outstanding conditions from §12 have been resolved:
 
-1. add executable Edge Function authorization tests for the identity endpoints;
-2. resolve the repository package-manager state and rerun `pnpm run typecheck`;
-3. capture at least one realistic `EXPLAIN (ANALYZE, BUFFERS)` sample for the new identity/membership paths.
+### Condition 1: Edge Function Authorization Tests
 
-Smallest next authorized action:
+Executable test harness created at `supabase/tests/sprint01_edge_function_auth.test.mjs`. Results: **38/38 passed**. All 15 test categories (EF-AUTH-01 through EF-AUTH-15) exercised at the actual Edge Function boundary using self-signed JWTs against the local Supabase edge runtime.
 
-> add executable local tests for `auth-context`, `profile-get`, and `tenant-context-select`, then rerun the full Sprint 1 and D2 suites unchanged.
+Evidence: `validation/evidence/sprint01_edge_function_authorization.json`
+
+### Condition 2: Package Manager Reconciliation
+
+Canonical package manager established as **npm 10.9.8**. Added `packageManager` field to `package.json`. Removed competing lockfile artifacts (`pnpm-lock.yaml`, `pnpm-workspace.yaml`). Clean install, typecheck, and build all pass.
+
+Evidence: `package.json` (packageManager field), clean `npm ci` output.
+
+### Condition 3: Performance Evidence
+
+Representative dataset seeded (50 tenants, 501 properties, 3,253 profiles, 3,001 residence memberships, 8,859 contacts, 10,000 audit events). All 12 identity query paths captured with `EXPLAIN (ANALYZE, BUFFERS)`. 10 of 12 use appropriate indexes. 2 sequential scans are acceptable at current scale.
+
+Evidence: `validation/evidence/sprint01_identity_explain_evidence.md`, `validation/evidence/sprint01_identity_explain_summary.json`
+
+### Updated Verdict
+
+```text
+SPRINT 1 PASS — FOUNDATION CERTIFIED
+```
+
+Full closure report: `docs/backend/18-sprint-01-conditions-closure-report.md`
+
+### Next Authorized Action
+
+```text
+Begin Sprint 2 — Resident, Residence and Association Domain.
+```
