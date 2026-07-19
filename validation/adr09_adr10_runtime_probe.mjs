@@ -15,6 +15,9 @@ const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
 const SUPABASE_JWT_SECRET = process.env.SUPABASE_JWT_SECRET;
 const SUPABASE_DB_URL = process.env.SUPABASE_DB_URL;
 
+const OBSERVATION_MS = 2000;
+const DELIVERY_WAIT_MS = 9000;
+
 const users = {
   residentA: '10000000-0000-0000-0000-000000000001',
   residentB: '10000000-0000-0000-0000-000000000002',
@@ -30,17 +33,11 @@ const profiles = {
 const requests = {
   residentA: '70000000-0000-0000-0000-000000000001',
   residentB: '70000000-0000-0000-0000-000000000002',
+  guessed: '70000000-0000-0000-0000-000000000099',
 };
-
-const topics = {
-  residentA: 'support-request:3cdb6d1e7d8a4bb08f9e18c2d53f6a41',
-  residentB: 'support-request:b4f8c61e2d3047f68b7c95e1a2fd4e73',
-  guessed: 'support-request:ffffffffffffffffffffffffffffffff',
-};
-
-const SUPPORT_EVENT = 'support_message.created';
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const runtimeId = () => crypto.randomUUID();
 
 function encodeBase64Url(input) {
   return Buffer.from(input)
@@ -71,7 +68,20 @@ function signJwt(sub, role = 'authenticated') {
 }
 
 function psql(sql) {
-  return execFileSync('psql', [SUPABASE_DB_URL, '-v', 'ON_ERROR_STOP=1', '-At', '-c', sql], {
+  return execFileSync('docker', [
+    'exec',
+    'supabase_db_aistudio-hoa-connect-resident-app',
+    'psql',
+    '-U',
+    'postgres',
+    '-d',
+    'postgres',
+    '-v',
+    'ON_ERROR_STOP=1',
+    '-At',
+    '-c',
+    sql,
+  ], {
     encoding: 'utf8',
   }).trim();
 }
@@ -125,48 +135,7 @@ async function subscribeToInserts(client, channelName, table, filter) {
     });
   });
 
-  return { channel, events, statuses };
-}
-
-async function subscribeToBroadcast(client, topic) {
-  const events = [];
-  const statuses = [];
-
-  const channel = client
-    .channel(topic, {
-      config: { private: true },
-    })
-    .on('broadcast', { event: SUPPORT_EVENT }, (payload) => {
-      events.push({
-        received_at: new Date().toISOString(),
-        payload,
-      });
-    });
-
-  await new Promise((resolve) => {
-    const timeout = setTimeout(() => resolve(), 7000);
-    channel.subscribe((status, err) => {
-      statuses.push({
-        status,
-        error: err?.message ?? null,
-        at: new Date().toISOString(),
-      });
-      if (status === 'SUBSCRIBED' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-        clearTimeout(timeout);
-        resolve();
-      }
-    });
-  });
-
-  return { channel, events, statuses };
-}
-
-function latestStatus(subscription) {
-  return subscription.statuses[subscription.statuses.length - 1]?.status ?? 'UNKNOWN';
-}
-
-function isDeniedSubscription(subscription) {
-  return latestStatus(subscription) !== 'SUBSCRIBED';
+  return { channel, events, statuses, filter: filter ?? null };
 }
 
 async function waitForEventCount(events, expectedCount, timeoutMs) {
@@ -180,14 +149,33 @@ async function waitForEventCount(events, expectedCount, timeoutMs) {
   return false;
 }
 
-async function assertNoNewEvent(events, baselineCount, observationMs) {
+async function observeNoNewEvents(label, subscription, baselineCount, insertedAt, observationMs = OBSERVATION_MS) {
   await sleep(observationMs);
-  return events.length === baselineCount;
+  return {
+    label,
+    channel_status: subscription.statuses[subscription.statuses.length - 1]?.status ?? 'UNKNOWN',
+    observation_duration_ms: observationMs,
+    inserted_at: insertedAt,
+    baseline_count: baselineCount,
+    final_count: subscription.events.length,
+    received_event_buffer: subscription.events.slice(baselineCount),
+    passed: subscription.events.length === baselineCount,
+  };
 }
 
-function hasOnlyApprovedPayloadKeys(payload) {
-  const approvedKeys = ['body', 'conversation_topic', 'created_at', 'has_attachments', 'message_id', 'sender_category', 'sequence'];
-  return Object.keys(payload).every((key) => approvedKeys.includes(key));
+function approvedSupportRow(newRow) {
+  const forbiddenKeys = ['internal_note', 'operator_note', 'audit_metadata', 'private_contact', 'service_metadata'];
+  return !forbiddenKeys.some((key) => Object.prototype.hasOwnProperty.call(newRow, key));
+}
+
+function hasUnauthorizedEnvelope(event) {
+  return Array.isArray(event.payload?.errors) && event.payload.errors.length > 0;
+}
+
+function extractAuthorizedRows(events) {
+  return events
+    .map((event) => event.payload?.new ?? null)
+    .filter((row) => row && Object.keys(row).length > 0);
 }
 
 async function run() {
@@ -205,293 +193,347 @@ async function run() {
   };
 
   const residentAClient = createAuthedClient(users.residentA);
+  const residentBClient = createAuthedClient(users.residentB);
   const unrelatedClient = createAuthedClient(users.unrelated);
   const operatorAClient = createAuthedClient(users.operatorA);
-
   const subscriptions = [];
 
   try {
     const residentNotif = await subscribeToInserts(
       residentAClient,
-      'd2-rt-notifications-resident-a',
+      'd2b-rt-notifications-resident-a',
       'notifications',
       `profile_id=eq.${profiles.residentA}`,
     );
     subscriptions.push({ client: residentAClient, channel: residentNotif.channel });
 
-    const notifInsertId = '90000000-0000-0000-0000-000000000001';
+    const notifInsertId = runtimeId();
     psql(`
       INSERT INTO public.notifications (id, tenant_id, profile_id, category, title_key, body_key)
       VALUES ('${notifInsertId}', '11111111-1111-1111-1111-111111111111', '${profiles.residentA}', 'invoice', 'rt01.title', 'rt01.body');
     `);
 
-    const rt01Delivered = await waitForEventCount(residentNotif.events, 1, 4000);
+    const rt01Delivered = await waitForEventCount(residentNotif.events, 1, DELIVERY_WAIT_MS);
     if (!rt01Delivered) {
       failures.push('RT-01 failed: expected authorized notification event was not delivered');
     }
 
     const notifNegativeStart = residentNotif.events.length;
-    const crossTenantNotificationId = '90000000-0000-0000-0000-000000000002';
+    const crossTenantNotificationId = runtimeId();
     psql(`
       INSERT INTO public.notifications (id, tenant_id, profile_id, category, title_key, body_key)
       VALUES ('${crossTenantNotificationId}', '22222222-2222-2222-2222-222222222222', '${profiles.residentB}', 'invoice', 'rt02.title', 'rt02.body');
     `);
-
-    const rt02Quiet = await assertNoNewEvent(residentNotif.events, notifNegativeStart, 2000);
-    if (!rt02Quiet) {
+    const rt02Observation = await observeNoNewEvents('rt02', residentNotif, notifNegativeStart, new Date().toISOString());
+    if (!rt02Observation.passed) {
       failures.push('RT-02 failed: Resident A received a cross-tenant notification');
     }
 
     const unrelatedNotif = await subscribeToInserts(
       unrelatedClient,
-      'd2-rt-notifications-unrelated',
+      'd2b-rt-notifications-unrelated',
       'notifications',
       `profile_id=eq.${profiles.residentA}`,
     );
     subscriptions.push({ client: unrelatedClient, channel: unrelatedNotif.channel });
 
-    const unrelatedInsertId = '90000000-0000-0000-0000-000000000003';
+    const unrelatedInsertId = runtimeId();
     psql(`
       INSERT INTO public.notifications (id, tenant_id, profile_id, category, title_key, body_key)
       VALUES ('${unrelatedInsertId}', '11111111-1111-1111-1111-111111111111', '${profiles.residentA}', 'invoice', 'rt03.title', 'rt03.body');
     `);
-
-    const rt03Quiet = await assertNoNewEvent(unrelatedNotif.events, 0, 2000);
-    if (!rt03Quiet) {
+    const rt03Observation = await observeNoNewEvents('rt03', unrelatedNotif, 0, new Date().toISOString());
+    if (!rt03Observation.passed) {
       failures.push('RT-03 failed: unrelated authenticated user received a notification');
     }
 
-    const residentSupport = await subscribeToBroadcast(residentAClient, topics.residentA);
+    const residentSupport = await subscribeToInserts(
+      residentAClient,
+      'd2b-rt-support-resident-a',
+      'support_messages',
+    );
     subscriptions.push({ client: residentAClient, channel: residentSupport.channel });
-    if (latestStatus(residentSupport) !== 'SUBSCRIBED') {
-      failures.push(`RT-04 failed: Resident A support subscription did not authorize (${latestStatus(residentSupport)})`);
-    }
 
-    const supportInsertId = '90000000-0000-0000-0000-000000000011';
+    const supportInsertId = runtimeId();
     psql(`
       INSERT INTO public.support_messages (id, support_request_id, sender_type, sender_profile_id, content, created_at)
-      VALUES ('${supportInsertId}', '${requests.residentA}', 'association', null, 'Runtime validation message A', '2026-07-19T09:53:37.862Z');
+      VALUES ('${supportInsertId}', '${requests.residentA}', 'association', null, 'Runtime validation message A', '2026-07-19T10:53:37.862Z');
     `);
-
-    const rt04Delivered = await waitForEventCount(residentSupport.events, 1, 4000);
+    const rt04Delivered = await waitForEventCount(residentSupport.events, 1, DELIVERY_WAIT_MS);
     if (!rt04Delivered) {
-      failures.push('RT-04 failed: expected support message broadcast was not delivered');
-    }
-    const rt04DeliveredCount = residentSupport.events.length;
-
-    const rt04Payload = residentSupport.events[0]?.payload?.payload ?? null;
-    if (!rt04Payload) {
-      failures.push('RT-04 failed: authorized support message payload missing');
-    } else {
-      if (!hasOnlyApprovedPayloadKeys(rt04Payload)) {
-        failures.push('RT-09 failed: support message payload exposed unapproved fields');
-      }
-      if (rt04Payload.sender_category !== 'association' || rt04Payload.body !== 'Runtime validation message A') {
-        failures.push('RT-04 failed: support message payload shape did not match the approved broadcast contract');
-      }
-      if (rt04Payload.conversation_topic !== topics.residentA) {
-        failures.push('RT-04 failed: support message payload carried the wrong opaque topic identifier');
-      }
+      failures.push('RT-04 failed: authorized support message event was not delivered');
     }
 
-    if (rt04DeliveredCount !== 1) {
-      failures.push(`RT-10 failed: expected exactly one logical event for one insert, received ${rt04DeliveredCount}`);
+    const rt04Snapshot = residentSupport.events.slice();
+    const rt04AuthorizedRows = extractAuthorizedRows(rt04Snapshot);
+    const rt04UnauthorizedEnvelopes = rt04Snapshot.filter(hasUnauthorizedEnvelope);
+    const rt04Payload = rt04Snapshot[0]?.payload ?? null;
+    if (rt04AuthorizedRows.length !== 1) {
+      failures.push('RT-04 failed: authorized support payload missing');
+    } else if (!approvedSupportRow(rt04AuthorizedRows[0])) {
+      failures.push('RT-09 failed: support row exposed forbidden fields');
+    }
+    if (rt04UnauthorizedEnvelopes.length > 0) {
+      failures.push('RT-04 failed: authorized subscription received an unauthorized envelope');
     }
 
-    const foreignTopicAttempt = await subscribeToBroadcast(residentAClient, topics.residentB);
-    subscriptions.push({ client: residentAClient, channel: foreignTopicAttempt.channel });
-    if (!isDeniedSubscription(foreignTopicAttempt)) {
-      failures.push('RT-05 failed: Resident A was allowed to subscribe to a foreign support topic');
+    if (rt04Snapshot.length !== 1 || rt04AuthorizedRows.length !== 1) {
+      failures.push(`RT-10 failed: expected one logical support event, received ${rt04Snapshot.length}`);
     }
 
-    const foreignSupportInsertId = '90000000-0000-0000-0000-000000000012';
+    const foreignSubscription = await subscribeToInserts(
+      residentAClient,
+      'd2b-rt-support-foreign-request',
+      'support_messages',
+      `support_request_id=eq.${requests.residentB}`,
+    );
+    subscriptions.push({ client: residentAClient, channel: foreignSubscription.channel });
+
+    const foreignInsertId = runtimeId();
     psql(`
       INSERT INTO public.support_messages (id, support_request_id, sender_type, sender_profile_id, content, created_at)
-      VALUES ('${foreignSupportInsertId}', '${requests.residentB}', 'association', null, 'Runtime validation message B', '2026-07-19T09:53:39.100Z');
+      VALUES ('${foreignInsertId}', '${requests.residentB}', 'association', null, 'Runtime validation message B', '2026-07-19T10:53:39.100Z');
     `);
-
-    const rt05Quiet = await assertNoNewEvent(foreignTopicAttempt.events, 0, 2000);
-    if (!rt05Quiet || foreignTopicAttempt.events.length !== 0) {
-      failures.push('RT-05 failed: foreign topic subscription exposed a support message event envelope');
+    const rt05Observation = await observeNoNewEvents('rt05', foreignSubscription, 0, new Date().toISOString());
+    if (!rt05Observation.passed) {
+      failures.push('RT-05 failed: foreign support message generated an event envelope');
     }
 
-    const unrelatedSupportAttempt = await subscribeToBroadcast(unrelatedClient, topics.residentA);
-    subscriptions.push({ client: unrelatedClient, channel: unrelatedSupportAttempt.channel });
-    if (!isDeniedSubscription(unrelatedSupportAttempt)) {
-      failures.push('RT-06 failed: unrelated authenticated user was allowed to subscribe to Resident A support topic');
-    }
-    if (unrelatedSupportAttempt.events.length !== 0) {
-      failures.push('RT-06 failed: unrelated authenticated user received support message events');
+    const unrelatedSupport = await subscribeToInserts(
+      unrelatedClient,
+      'd2b-rt-support-unrelated',
+      'support_messages',
+      `support_request_id=eq.${requests.residentA}`,
+    );
+    subscriptions.push({ client: unrelatedClient, channel: unrelatedSupport.channel });
+
+    const unrelatedSupportInsertId = runtimeId();
+    psql(`
+      INSERT INTO public.support_messages (id, support_request_id, sender_type, sender_profile_id, content, created_at)
+      VALUES ('${unrelatedSupportInsertId}', '${requests.residentA}', 'association', null, 'Runtime validation message C', '2026-07-19T10:53:41.000Z');
+    `);
+    const rt06Observation = await observeNoNewEvents('rt06', unrelatedSupport, 0, new Date().toISOString());
+    if (!rt06Observation.passed) {
+      failures.push('RT-06 failed: unrelated authenticated user received a support message event');
     }
 
-    const guessedTopicAttempt = await subscribeToBroadcast(residentAClient, topics.guessed);
-    subscriptions.push({ client: residentAClient, channel: guessedTopicAttempt.channel });
-    if (!isDeniedSubscription(guessedTopicAttempt)) {
-      failures.push('RT-07 failed: guessed opaque topic was accepted');
-    }
-    if (guessedTopicAttempt.events.length !== 0) {
-      failures.push('RT-07 failed: guessed opaque topic produced events');
+    const guessedRequestSubscription = await subscribeToInserts(
+      residentAClient,
+      'd2b-rt-support-guessed-request',
+      'support_messages',
+      `support_request_id=eq.${requests.guessed}`,
+    );
+    subscriptions.push({ client: residentAClient, channel: guessedRequestSubscription.channel });
+
+    const rt07ObservationRequest = await observeNoNewEvents('rt07_request', guessedRequestSubscription, 0, new Date().toISOString());
+    if (!rt07ObservationRequest.passed) {
+      failures.push('RT-07 failed: guessed request filter discovered foreign activity');
     }
 
-    const residentSupportRows = await residentAClient.from('support_messages').select('id');
-    if (!residentSupportRows.error) {
-      failures.push('RT-08 failed: direct authenticated read of support_messages was not denied');
+    const residentSupportRows = await residentAClient
+      .from('support_messages')
+      .select('id, tenant_id, property_id, resident_profile_id, support_request_id, delivery_sequence, sender_type, sender_profile_id, content, created_at')
+      .order('created_at', { ascending: true });
+    const unauthorizedRows = residentSupportRows.data?.filter((row) => row.support_request_id !== requests.residentA) ?? [];
+    if (residentSupportRows.error || unauthorizedRows.length > 0) {
+      failures.push('RT-08 failed: direct support_messages read returned an error or unauthorized rows');
     }
 
-    const orderedSupport = await subscribeToBroadcast(residentAClient, topics.residentA);
-    subscriptions.push({ client: residentAClient, channel: orderedSupport.channel });
-    if (latestStatus(orderedSupport) !== 'SUBSCRIBED') {
-      failures.push(`RT-11 failed: ordering subscription did not authorize (${latestStatus(orderedSupport)})`);
-    }
+    const orderedSubscription = await subscribeToInserts(
+      residentAClient,
+      'd2b-rt-support-ordering',
+      'support_messages',
+    );
+    subscriptions.push({ client: residentAClient, channel: orderedSubscription.channel });
 
-    const orderedInsertA = '90000000-0000-0000-0000-000000000013';
-    const orderedInsertB = '90000000-0000-0000-0000-000000000014';
+    const orderedInsertA = runtimeId();
+    const orderedInsertB = runtimeId();
     psql(`
       INSERT INTO public.support_messages (id, support_request_id, sender_type, sender_profile_id, content, created_at)
       VALUES
-        ('${orderedInsertA}', '${requests.residentA}', 'association', null, 'Ordering message 1', '2026-07-19T09:53:41.000Z'),
-        ('${orderedInsertB}', '${requests.residentA}', 'association', null, 'Ordering message 2', '2026-07-19T09:53:42.000Z');
+        ('${orderedInsertA}', '${requests.residentA}', 'association', null, 'Ordering message 1', '2026-07-19T10:53:42.000Z'),
+        ('${orderedInsertB}', '${requests.residentA}', 'association', null, 'Ordering message 2', '2026-07-19T10:53:43.000Z');
     `);
-
-    const rt11Delivered = await waitForEventCount(orderedSupport.events, 2, 4000);
+    const rt11Delivered = await waitForEventCount(orderedSubscription.events, 2, DELIVERY_WAIT_MS);
+    const rt11Snapshot = orderedSubscription.events.slice();
+    const rt11AuthorizedRows = extractAuthorizedRows(rt11Snapshot);
+    const rt11UnauthorizedEnvelopes = rt11Snapshot.filter(hasUnauthorizedEnvelope);
     if (!rt11Delivered) {
-      failures.push('RT-11 failed: expected ordered support message events were not delivered');
+      failures.push('RT-11 failed: ordered support message events were not delivered');
+    } else if (rt11UnauthorizedEnvelopes.length > 0 || rt11AuthorizedRows.length < 2) {
+      failures.push('RT-11 failed: ordered subscription received unauthorized or incomplete envelopes');
     } else {
-      const sequences = orderedSupport.events.map((event) => event.payload.payload.sequence);
-      if (!(sequences[0] < sequences[1])) {
-        failures.push('RT-11 failed: support message sequence values were not strictly increasing');
+      const [first, second] = rt11AuthorizedRows;
+      const isStableOrder =
+        first.created_at < second.created_at ||
+        (first.created_at === second.created_at && first.delivery_sequence < second.delivery_sequence);
+      if (!isStableOrder) {
+        failures.push('RT-11 failed: support message ordering fields were not deterministic');
       }
     }
 
-    const revocationSupport = await subscribeToBroadcast(residentAClient, topics.residentA);
-    subscriptions.push({ client: residentAClient, channel: revocationSupport.channel });
-    if (latestStatus(revocationSupport) !== 'SUBSCRIBED') {
-      failures.push(`RT-12 failed: revocation precondition subscription did not authorize (${latestStatus(revocationSupport)})`);
-    }
+    const revocationSubscription = await subscribeToInserts(
+      residentAClient,
+      'd2b-rt-support-revocation',
+      'support_messages',
+    );
+    subscriptions.push({ client: residentAClient, channel: revocationSubscription.channel });
     psql(`
       UPDATE public.residence_members
       SET status = 'revoked'
       WHERE id = '30000000-0000-0000-0000-000000000001';
-
-      SELECT public.rotate_support_request_topic('${requests.residentA}');
     `);
-    const revokedInsertId = '90000000-0000-0000-0000-000000000015';
+    const revokedInsertId = runtimeId();
     psql(`
       INSERT INTO public.support_messages (id, support_request_id, sender_type, sender_profile_id, content, created_at)
-      VALUES ('${revokedInsertId}', '${requests.residentA}', 'association', null, 'Revocation message', '2026-07-19T09:53:44.000Z');
+      VALUES ('${revokedInsertId}', '${requests.residentA}', 'association', null, 'Revocation message', '2026-07-19T10:53:44.000Z');
     `);
-    const rt12Quiet = await assertNoNewEvent(revocationSupport.events, 0, 2000);
-    if (!rt12Quiet) {
-      failures.push('RT-12 failed: revoked subscriber still received support events');
+    const rt12Observation = await observeNoNewEvents('rt12', revocationSubscription, 0, new Date().toISOString());
+    if (!rt12Observation.passed) {
+      failures.push('RT-12 failed: revoked resident still received support events');
     }
-
-    const reconnectSupportInitial = await subscribeToBroadcast(operatorAClient, topics.residentA);
-    subscriptions.push({ client: operatorAClient, channel: reconnectSupportInitial.channel });
-    const oldTopicAfterRotation = topics.residentA;
-    const rotatedTopic = psql(`
-      SELECT realtime_topic
-      FROM public.support_requests
-      WHERE id = '${requests.residentA}';
+    psql(`
+      UPDATE public.residence_members
+      SET status = 'active'
+      WHERE id = '30000000-0000-0000-0000-000000000001';
     `);
-    if (latestStatus(reconnectSupportInitial) !== 'CHANNEL_ERROR' && latestStatus(reconnectSupportInitial) !== 'TIMED_OUT' && latestStatus(reconnectSupportInitial) !== 'CLOSED') {
-      failures.push('RT-14 setup failed: Operator A unexpectedly subscribed to the stale pre-rotation topic');
-    }
 
-    const reconnectSupport = await subscribeToBroadcast(operatorAClient, rotatedTopic);
-    subscriptions.push({ client: operatorAClient, channel: reconnectSupport.channel });
-    if (latestStatus(reconnectSupport) !== 'SUBSCRIBED') {
-      failures.push(`RT-14 failed: operator reconnect to rotated topic did not authorize (${latestStatus(reconnectSupport)})`);
-    }
+    const tenantASubscription = await subscribeToInserts(
+      residentAClient,
+      'd2b-rt-support-tenant-a',
+      'support_messages',
+    );
+    subscriptions.push({ client: residentAClient, channel: tenantASubscription.channel });
+    const tenantBSubscription = await subscribeToInserts(
+      residentBClient,
+      'd2b-rt-support-tenant-b',
+      'support_messages',
+    );
+    subscriptions.push({ client: residentBClient, channel: tenantBSubscription.channel });
 
-    await reconnectSupport.channel.unsubscribe();
-    const reconnectSupportSecond = await subscribeToBroadcast(operatorAClient, rotatedTopic);
-    subscriptions.push({ client: operatorAClient, channel: reconnectSupportSecond.channel });
-    if (latestStatus(reconnectSupportSecond) !== 'SUBSCRIBED') {
-      failures.push(`RT-14 failed: operator second reconnect to rotated topic did not authorize (${latestStatus(reconnectSupportSecond)})`);
-    }
-    const reconnectInsertId = '90000000-0000-0000-0000-000000000016';
+    const tenantAInsert = runtimeId();
+    const tenantBInsert = runtimeId();
     psql(`
       INSERT INTO public.support_messages (id, support_request_id, sender_type, sender_profile_id, content, created_at)
-      VALUES ('${reconnectInsertId}', '${requests.residentA}', 'association', null, 'Reconnect message', '2026-07-19T09:53:46.000Z');
+      VALUES
+        ('${tenantAInsert}', '${requests.residentA}', 'association', null, 'Tenant A message', '2026-07-19T10:53:45.000Z'),
+        ('${tenantBInsert}', '${requests.residentB}', 'association', null, 'Tenant B message', '2026-07-19T10:53:46.000Z');
     `);
-    const rt14Delivered = await waitForEventCount(reconnectSupportSecond.events, 1, 4000);
-    if (!rt14Delivered || reconnectSupportSecond.events.length !== 1) {
+    const rt13ADelivered = await waitForEventCount(tenantASubscription.events, 1, DELIVERY_WAIT_MS);
+    const rt13BDelivered = await waitForEventCount(tenantBSubscription.events, 1, DELIVERY_WAIT_MS);
+    const rt13AAuthorizedRows = extractAuthorizedRows(tenantASubscription.events);
+    const rt13BAuthorizedRows = extractAuthorizedRows(tenantBSubscription.events);
+    const rt13AUnauthorizedEnvelopes = tenantASubscription.events.filter(hasUnauthorizedEnvelope);
+    const rt13BUnauthorizedEnvelopes = tenantBSubscription.events.filter(hasUnauthorizedEnvelope);
+    if (!rt13ADelivered || !rt13BDelivered) {
+      failures.push('RT-13 failed: concurrent tenant subscriptions did not receive their own authorized events');
+    }
+    if (rt13AUnauthorizedEnvelopes.length > 0 || rt13BUnauthorizedEnvelopes.length > 0) {
+      failures.push('RT-13 failed: concurrent tenant subscriptions received unauthorized envelopes');
+    }
+    if (
+      rt13AAuthorizedRows.some((row) => row.support_request_id !== requests.residentA) ||
+      rt13BAuthorizedRows.some((row) => row.support_request_id !== requests.residentB)
+    ) {
+      failures.push('RT-13 failed: concurrent tenant subscriptions observed cross-tenant activity');
+    }
+
+    const reconnectSubscriptionA = await subscribeToInserts(
+      residentAClient,
+      'd2b-rt-support-reconnect-a',
+      'support_messages',
+    );
+    subscriptions.push({ client: residentAClient, channel: reconnectSubscriptionA.channel });
+    await reconnectSubscriptionA.channel.unsubscribe();
+    const reconnectSubscriptionB = await subscribeToInserts(
+      residentAClient,
+      'd2b-rt-support-reconnect-b',
+      'support_messages',
+    );
+    subscriptions.push({ client: residentAClient, channel: reconnectSubscriptionB.channel });
+    const reconnectInsertId = runtimeId();
+    psql(`
+      INSERT INTO public.support_messages (id, support_request_id, sender_type, sender_profile_id, content, created_at)
+      VALUES ('${reconnectInsertId}', '${requests.residentA}', 'association', null, 'Reconnect message', '2026-07-19T10:53:47.000Z');
+    `);
+    const rt14Delivered = await waitForEventCount(reconnectSubscriptionB.events, 1, DELIVERY_WAIT_MS);
+    const rt14Snapshot = reconnectSubscriptionB.events.slice();
+    const rt14AuthorizedRows = extractAuthorizedRows(rt14Snapshot);
+    const rt14UnauthorizedEnvelopes = rt14Snapshot.filter(hasUnauthorizedEnvelope);
+    if (!rt14Delivered || rt14AuthorizedRows.length !== 1 || rt14UnauthorizedEnvelopes.length > 0) {
       failures.push('RT-14 failed: reconnect behavior delivered the wrong number of events');
     }
 
-    const residentNotifRows = await residentAClient.from('notifications').select('id, profile_id, tenant_id').order('created_at', { ascending: true });
     const residentProfilesRows = await residentAClient.from('profiles').select('id');
     const operatorProfilesRows = await operatorAClient.from('profiles').select('id');
     const unrelatedProfilesRows = await unrelatedClient.from('profiles').select('id');
 
     evidence.adr09 = {
-      topic_format: {
-        authorized_topic: oldTopicAfterRotation,
-        guessed_topic: topics.guessed,
-      },
+      selected_model: 'B1 direct resident ownership projection',
+      observation_duration_ms: OBSERVATION_MS,
       rt01: {
         statuses: residentNotif.statuses,
         inserted_id: notifInsertId,
         delivered_count: residentNotif.events.length >= 1 ? 1 : 0,
         payload: residentNotif.events[0]?.payload ?? null,
       },
-      rt02: {
-        observation_window_ms: 2000,
-        event_count_before: notifNegativeStart,
-        event_count_after: residentNotif.events.length,
-      },
-      rt03: {
-        statuses: unrelatedNotif.statuses,
-        observation_window_ms: 2000,
-        delivered_count: unrelatedNotif.events.length,
-      },
+      rt02: rt02Observation,
+      rt03: rt03Observation,
       rt04: {
         statuses: residentSupport.statuses,
         inserted_id: supportInsertId,
-        delivered_count: rt04DeliveredCount,
-        payload: residentSupport.events[0]?.payload ?? null,
+        delivered_count: rt04Snapshot.length,
+        authorized_rows: rt04AuthorizedRows,
+        unauthorized_envelopes: rt04UnauthorizedEnvelopes.map((event) => event.payload),
+        payload: rt04Payload,
       },
       rt05: {
-        statuses: foreignTopicAttempt.statuses,
-        delivered_count: foreignTopicAttempt.events.length,
+        statuses: foreignSubscription.statuses,
+        evidence: rt05Observation,
       },
       rt06: {
-        statuses: unrelatedSupportAttempt.statuses,
-        delivered_count: unrelatedSupportAttempt.events.length,
+        statuses: unrelatedSupport.statuses,
+        evidence: rt06Observation,
       },
       rt07: {
-        statuses: guessedTopicAttempt.statuses,
-        delivered_count: guessedTopicAttempt.events.length,
+        request_filter: guessedRequestSubscription.filter,
+        request_evidence: rt07ObservationRequest,
       },
       rt08: {
-        support_messages_status: residentSupportRows.status,
-        support_messages_error: residentSupportRows.error?.message ?? null,
+        status: residentSupportRows.status,
+        row_ids: residentSupportRows.data?.map((row) => row.id) ?? [],
+        unauthorized_row_count: unauthorizedRows.length,
       },
       rt09: {
-        payload_keys: rt04Payload ? Object.keys(rt04Payload).sort() : [],
-        approved_only: rt04Payload ? hasOnlyApprovedPayloadKeys(rt04Payload) : false,
+        approved_only: rt04AuthorizedRows.length > 0 && approvedSupportRow(rt04AuthorizedRows[0]),
+        row_keys: rt04AuthorizedRows.length > 0 ? Object.keys(rt04AuthorizedRows[0]).sort() : [],
       },
       rt10: {
         inserted_id: supportInsertId,
-        delivered_count: rt04DeliveredCount,
+        delivered_count: rt04Snapshot.length,
       },
       rt11: {
         inserted_ids: [orderedInsertA, orderedInsertB],
-        sequences: orderedSupport.events.map((event) => event.payload.payload.sequence),
+        ordering_rows: rt11AuthorizedRows.map((row) => ({
+          id: row.id,
+          created_at: row.created_at,
+          delivery_sequence: row.delivery_sequence,
+        })),
       },
-      rt12: {
-        statuses: revocationSupport.statuses,
-        rotated_topic: rotatedTopic,
-        delivered_count: revocationSupport.events.length,
-      },
+      rt12: rt12Observation,
       rt13: {
-        tenant_b_foreign_topic_statuses: foreignTopicAttempt.statuses,
-        tenant_b_foreign_topic_events: foreignTopicAttempt.events.length,
+        tenant_a_statuses: tenantASubscription.statuses,
+        tenant_b_statuses: tenantBSubscription.statuses,
+        tenant_a_events: rt13AAuthorizedRows.map((row) => row.id),
+        tenant_b_events: rt13BAuthorizedRows.map((row) => row.id),
+        tenant_a_unauthorized_envelopes: rt13AUnauthorizedEnvelopes.map((event) => event.payload),
+        tenant_b_unauthorized_envelopes: rt13BUnauthorizedEnvelopes.map((event) => event.payload),
       },
       rt14: {
-        first_attempt_statuses: reconnectSupportInitial.statuses,
-        reconnect_statuses: reconnectSupportSecond.statuses,
-        delivered_count: reconnectSupportSecond.events.length,
+        reconnect_statuses: reconnectSubscriptionB.statuses,
+        delivered_count: rt14Snapshot.length,
+        event_ids: rt14AuthorizedRows.map((row) => row.id),
+        unauthorized_envelopes: rt14UnauthorizedEnvelopes.map((event) => event.payload),
       },
     };
 
@@ -506,10 +548,6 @@ async function run() {
       },
       pr11_sensitive_field_exposure: {
         note: 'Direct PostgREST access to profiles is denied because authenticated has no SELECT grant on profiles.',
-      },
-      notification_direct_read_boundary: {
-        notifications_status: residentNotifRows.status,
-        notification_ids: residentNotifRows.data?.map((row) => row.id) ?? [],
       },
     };
 
@@ -528,6 +566,7 @@ async function run() {
 
     await Promise.allSettled([
       residentAClient.removeAllChannels(),
+      residentBClient.removeAllChannels(),
       unrelatedClient.removeAllChannels(),
       operatorAClient.removeAllChannels(),
     ]);

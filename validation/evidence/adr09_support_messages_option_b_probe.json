@@ -1,0 +1,297 @@
+{
+  "generated_at": "2026-07-19T13:51:48.661Z",
+  "environment": {
+    "type": "local-supabase-cli",
+    "api_url": "http://127.0.0.1:54331",
+    "project_reference": "aistudio-hoa-connect-resident-app",
+    "classification": "non-production local disposable stack"
+  },
+  "adr09": {
+    "selected_model": "B1 direct resident ownership projection",
+    "observation_duration_ms": 2000,
+    "rt01": {
+      "statuses": [
+        {
+          "status": "SUBSCRIBED",
+          "error": null,
+          "at": "2026-07-19T13:51:48.748Z"
+        }
+      ],
+      "inserted_id": "33c1febe-33e3-43c4-864e-9e504a93a53a",
+      "delivered_count": 1,
+      "payload": {
+        "schema": "public",
+        "table": "notifications",
+        "commit_timestamp": "2026-07-19T13:51:48.859Z",
+        "eventType": "INSERT",
+        "new": {
+          "id": "33c1febe-33e3-43c4-864e-9e504a93a53a",
+          "params": {},
+          "read_at": null,
+          "body_key": "rt01.body",
+          "category": "invoice",
+          "tenant_id": "11111111-1111-1111-1111-111111111111",
+          "title_key": "rt01.title",
+          "created_at": "2026-07-19T13:51:48.857535+00:00",
+          "profile_id": "20000000-0000-0000-0000-000000000001"
+        },
+        "old": {},
+        "errors": null
+      }
+    },
+    "rt02": {
+      "label": "rt02",
+      "channel_status": "SUBSCRIBED",
+      "observation_duration_ms": 2000,
+      "inserted_at": "2026-07-19T13:51:49.081Z",
+      "baseline_count": 1,
+      "final_count": 1,
+      "received_event_buffer": [],
+      "passed": true
+    },
+    "rt03": {
+      "label": "rt03",
+      "channel_status": "SUBSCRIBED",
+      "observation_duration_ms": 2000,
+      "inserted_at": "2026-07-19T13:51:51.186Z",
+      "baseline_count": 0,
+      "final_count": 0,
+      "received_event_buffer": [],
+      "passed": true
+    },
+    "rt04": {
+      "statuses": [
+        {
+          "status": "SUBSCRIBED",
+          "error": null,
+          "at": "2026-07-19T13:51:53.193Z"
+        }
+      ],
+      "inserted_id": "e0793cc0-95d0-4b29-a90d-ca4ee06b023c",
+      "delivered_count": 1,
+      "authorized_rows": [],
+      "unauthorized_envelopes": [
+        {
+          "schema": "public",
+          "table": "support_messages",
+          "commit_timestamp": null,
+          "eventType": "INSERT",
+          "new": {},
+          "old": {},
+          "errors": [
+            "Error 401: Unauthorized"
+          ]
+        }
+      ],
+      "payload": {
+        "schema": "public",
+        "table": "support_messages",
+        "commit_timestamp": null,
+        "eventType": "INSERT",
+        "new": {},
+        "old": {},
+        "errors": [
+          "Error 401: Unauthorized"
+        ]
+      }
+    },
+    "rt05": {
+      "statuses": [
+        {
+          "status": "SUBSCRIBED",
+          "error": null,
+          "at": "2026-07-19T13:51:53.714Z"
+        }
+      ],
+      "evidence": {
+        "label": "rt05",
+        "channel_status": "SUBSCRIBED",
+        "observation_duration_ms": 2000,
+        "inserted_at": "2026-07-19T13:51:53.847Z",
+        "baseline_count": 0,
+        "final_count": 0,
+        "received_event_buffer": [],
+        "passed": true
+      }
+    },
+    "rt06": {
+      "statuses": [
+        {
+          "status": "SUBSCRIBED",
+          "error": null,
+          "at": "2026-07-19T13:51:55.852Z"
+        }
+      ],
+      "evidence": {
+        "label": "rt06",
+        "channel_status": "SUBSCRIBED",
+        "observation_duration_ms": 2000,
+        "inserted_at": "2026-07-19T13:51:55.932Z",
+        "baseline_count": 0,
+        "final_count": 0,
+        "received_event_buffer": [],
+        "passed": true
+      }
+    },
+    "rt07": {
+      "request_filter": "support_request_id=eq.70000000-0000-0000-0000-000000000099",
+      "request_evidence": {
+        "label": "rt07_request",
+        "channel_status": "SUBSCRIBED",
+        "observation_duration_ms": 2000,
+        "inserted_at": "2026-07-19T13:51:57.936Z",
+        "baseline_count": 0,
+        "final_count": 0,
+        "received_event_buffer": [],
+        "passed": true
+      }
+    },
+    "rt08": {
+      "status": 200,
+      "row_ids": [
+        "80000000-0000-0000-0000-000000000001",
+        "e0793cc0-95d0-4b29-a90d-ca4ee06b023c",
+        "90000000-0000-0000-0000-000000000011",
+        "f4ceddae-2916-4a76-9f8a-8f0b92e267cd",
+        "90000000-0000-0000-0000-000000000013",
+        "90000000-0000-0000-0000-000000000014",
+        "90000000-0000-0000-0000-000000000015",
+        "90000000-0000-0000-0000-000000000016",
+        "90000000-0000-0000-0000-000000000017",
+        "90000000-0000-0000-0000-000000000019"
+      ],
+      "unauthorized_row_count": 0
+    },
+    "rt09": {
+      "approved_only": false,
+      "row_keys": []
+    },
+    "rt10": {
+      "inserted_id": "e0793cc0-95d0-4b29-a90d-ca4ee06b023c",
+      "delivered_count": 1
+    },
+    "rt11": {
+      "inserted_ids": [
+        "327cebb5-b557-4b96-9827-983a1db833a9",
+        "f2b808cd-3782-4f7d-8c9c-cf0523811436"
+      ],
+      "ordering_rows": []
+    },
+    "rt12": {
+      "label": "rt12",
+      "channel_status": "SUBSCRIBED",
+      "observation_duration_ms": 2000,
+      "inserted_at": "2026-07-19T13:52:00.574Z",
+      "baseline_count": 0,
+      "final_count": 1,
+      "received_event_buffer": [
+        {
+          "received_at": "2026-07-19T13:52:00.791Z",
+          "payload": {
+            "schema": "public",
+            "table": "support_messages",
+            "commit_timestamp": null,
+            "eventType": "INSERT",
+            "new": {},
+            "old": {},
+            "errors": [
+              "Error 401: Unauthorized"
+            ]
+          }
+        }
+      ],
+      "passed": false
+    },
+    "rt13": {
+      "tenant_a_statuses": [
+        {
+          "status": "SUBSCRIBED",
+          "error": null,
+          "at": "2026-07-19T13:52:02.691Z"
+        }
+      ],
+      "tenant_b_statuses": [
+        {
+          "status": "SUBSCRIBED",
+          "error": null,
+          "at": "2026-07-19T13:52:02.699Z"
+        }
+      ],
+      "tenant_a_events": [],
+      "tenant_b_events": [
+        "520dc177-55ae-4d9a-825d-51f6952f4467"
+      ],
+      "tenant_a_unauthorized_envelopes": [
+        {
+          "schema": "public",
+          "table": "support_messages",
+          "commit_timestamp": null,
+          "eventType": "INSERT",
+          "new": {},
+          "old": {},
+          "errors": [
+            "Error 401: Unauthorized"
+          ]
+        },
+        {
+          "schema": "public",
+          "table": "support_messages",
+          "commit_timestamp": null,
+          "eventType": "INSERT",
+          "new": {},
+          "old": {},
+          "errors": [
+            "Error 401: Unauthorized"
+          ]
+        }
+      ],
+      "tenant_b_unauthorized_envelopes": []
+    },
+    "rt14": {
+      "reconnect_statuses": [
+        {
+          "status": "SUBSCRIBED",
+          "error": null,
+          "at": "2026-07-19T13:52:02.903Z"
+        }
+      ],
+      "delivered_count": 1,
+      "event_ids": [],
+      "unauthorized_envelopes": [
+        {
+          "schema": "public",
+          "table": "support_messages",
+          "commit_timestamp": null,
+          "eventType": "INSERT",
+          "new": {},
+          "old": {},
+          "errors": [
+            "Error 401: Unauthorized"
+          ]
+        }
+      ]
+    }
+  },
+  "adr10_api_surface": {
+    "pr10_enumeration_resistance": {
+      "resident_profiles_status": 403,
+      "resident_profiles_error": "permission denied for table profiles",
+      "operator_profiles_status": 403,
+      "operator_profiles_error": "permission denied for table profiles",
+      "unrelated_profiles_status": 403,
+      "unrelated_profiles_error": "permission denied for table profiles"
+    },
+    "pr11_sensitive_field_exposure": {
+      "note": "Direct PostgREST access to profiles is denied because authenticated has no SELECT grant on profiles."
+    }
+  },
+  "failures": [
+    "RT-04 failed: authorized support payload missing",
+    "RT-04 failed: authorized subscription received an unauthorized envelope",
+    "RT-10 failed: expected one logical support event, received 1",
+    "RT-11 failed: ordered subscription received unauthorized or incomplete envelopes",
+    "RT-12 failed: revoked resident still received support events",
+    "RT-13 failed: concurrent tenant subscriptions received unauthorized envelopes",
+    "RT-14 failed: reconnect behavior delivered the wrong number of events"
+  ]
+}

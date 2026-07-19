@@ -1,8 +1,8 @@
 # 14 — Realtime Remediation Report
 
 > HOA CONNECT — Backend Integration Program  
-> Realtime Remediation Wave for `support_messages`  
-> Date: **July 19, 2026**
+> Realtime Remediation Wave B for `support_messages`
+> Date: July 19, 2026
 
 ---
 
@@ -15,9 +15,7 @@ notifications and support_messages can both use
 postgres_changes + narrow SELECT grant + RLS
 ```
 
-That assumption failed for `support_messages` in the first D2 validation wave.
-
-Observed foreign event envelope:
+That assumption failed for `support_messages` in the earlier D2 runtime wave because Resident A received:
 
 ```json
 {
@@ -30,11 +28,12 @@ Observed foreign event envelope:
 }
 ```
 
-Why that is still a failure:
+Why this is still a failure:
 
-- the subscriber learned that a foreign write occurred;
-- the required outcome was `no event delivered`;
-- an unauthorized envelope is still cross-conversation leakage.
+- the client received an event envelope;
+- the envelope revealed that a foreign write occurred;
+- `401 inside an event` is not equivalent to isolation;
+- required result was `no event delivered`.
 
 ---
 
@@ -42,83 +41,86 @@ Why that is still a failure:
 
 ### Option A — Private Broadcast
 
-Tested in this wave.
+Rejected in the prior remediation wave.
 
-Validation transport:
+Observed result:
 
-```text
-support_messages INSERT
-→ trusted trigger
-→ realtime.send(...)
-→ private topic support-request:<opaque-id>
-→ authorized subscriber
-```
+- unauthorized topics were denied;
+- authorized support delivery path failed;
+- no accepted transport resulted.
 
-### Option B — Denormalized direct ownership predicate
+### Option B — Denormalized direct ownership
 
-Not implemented in this wave.
+Implemented in this wave and revalidated locally.
 
-Reason:
-
-- Option A was the smaller change that preserved direct-read denial and payload minimization;
-- Option A had to be tested first before duplicating ownership onto the row.
-
-### Decision criteria
-
-Accept only a design that proves:
+Decision rule used:
 
 ```text
-authorized participant receives the event
-and
-unauthorized user receives no event, envelope, or metadata
+accept only if authorized payload delivery succeeds
+and foreign or unrelated users receive no event envelope
 ```
 
 ### Result
 
-- Option A was **runtime-tested and rejected**.
-- Option B is the **smallest next remediation**.
+- Option A remains rejected.
+- Option B local SQL controls passed.
+- Option B Realtime runtime still failed.
 
 ---
 
-## 3. Revised architecture state
+## 3. Revised architecture under test
 
-### Notifications
-
-Retained:
+### Transport
 
 ```text
-postgres_changes + narrow SELECT grant + RLS
+support_messages on postgres_changes
 ```
 
-This path remains validated.
+### Grant model
 
-### Support messages
-
-Attempted private-Broadcast design:
-
-- `support_messages` removed from the publication;
-- direct authenticated read revoked;
-- opaque topic stored as `support-request:<non-guessable-id>`;
-- trusted trigger published minimized payloads through `realtime.send(...)`;
-- `realtime.messages` RLS added for channel authorization.
-
-Join-probe facts discovered in local runtime:
-
-- Realtime requires an insert-authorizable probe row on `realtime.messages`;
-- observed probe shape:
-  - `topic=<requested topic>`
-  - `extension='broadcast'`
-  - `event IS NULL`
-  - `payload IS NULL`
-  - `private=false`
-
-Even after matching that probe shape with a constrained insert policy, authorized subscribers still received:
-
-```text
-CHANNEL_ERROR
+```sql
+GRANT SELECT ON public.support_messages TO authenticated;
 ```
 
-No support-message replacement transport is accepted yet.
+No direct `INSERT`, `UPDATE`, or `DELETE` grant to `authenticated`.
+
+### Server-derived ownership
+
+Derived on insert from `support_requests`:
+
+- `tenant_id`
+- `property_id`
+- `resident_profile_id`
+- `resident_user_id`
+- `resident_access_revoked`
+
+### Authorization model
+
+Resident predicate:
+
+```sql
+resident_user_id = auth.uid()
+AND resident_access_revoked = false
+```
+
+Separate policies exist for:
+
+- authorized staff;
+- platform administrators.
+
+### Immutability controls
+
+After insert, trigger protection denies changes to:
+
+- `tenant_id`
+- `property_id`
+- `resident_profile_id`
+- `resident_user_id`
+- `support_request_id`
+
+### Direct-read behavior
+
+Direct authenticated reads were allowed only through narrow `SELECT` plus RLS and returned authorized rows only.
 
 ---
 
@@ -126,24 +128,23 @@ No support-message replacement transport is accepted yet.
 
 | Field | Value |
 |---|---|
-| Project | local Supabase CLI `aistudio-hoa-connect-resident-app` |
+| Project | local Supabase CLI stack `aistudio-hoa-connect-resident-app` |
 | API | `http://127.0.0.1:54331` |
 | DB | `127.0.0.1:54332` |
 | Supabase CLI | `v2.107.0` |
-| Postgres image | `public.ecr.aws/supabase/postgres:17.6.1.136` |
+| Postgres | `17.6` |
 | Realtime image | `public.ecr.aws/supabase/realtime:v2.107.5` |
-| Proof of isolation | loopback-only; repo-local config; no hosted project refs; no production access |
+| Isolation proof | loopback-only local stack, no hosted refs, no production access |
 
 Reset procedure:
 
-1. run `validation/d2_setup.sql`
-2. allow local services to settle briefly
-3. run SQL validation
-4. run runtime probe
+1. apply `validation/d2_setup.sql`
+2. run `validation/adr09_adr10_sql_tests.sql`
+3. run `validation/adr09_adr10_runtime_probe.mjs`
 
-Evidence file:
+Evidence:
 
-- [validation/evidence/adr09_support_messages_broadcast_probe.json](/home/ubuntu/projects/connect/03-products/hoa-connect/aistudio-hoa-connect-resident-app/validation/evidence/adr09_support_messages_broadcast_probe.json)
+- [validation/evidence/adr09_support_messages_option_b_probe.json](/home/ubuntu/projects/connect/03-products/hoa-connect/aistudio-hoa-connect-resident-app/validation/evidence/adr09_support_messages_option_b_probe.json)
 
 ---
 
@@ -151,40 +152,48 @@ Evidence file:
 
 | Case | Expected | Actual | Result |
 |---|---|---|---|
-| RT-01 | exactly one event delivered | one notification event delivered | PASS |
-| RT-02 | no event delivered | no foreign notification payload | PASS |
-| RT-03 | no event delivered | zero notification events | PASS |
-| RT-04 | exactly one support event delivered | `CHANNEL_ERROR`, zero events | FAIL |
-| RT-05 | no event, no envelope, no metadata | zero foreign-topic events, but authorized path still red | FAIL |
-| RT-06 | unrelated user denied or silent | join rejected | PASS |
-| RT-07 | guessed topic reveals nothing | guessed topic rejected / timed out | PASS |
-| RT-08 | direct authenticated read denied | `403 permission denied for table support_messages` | PASS |
-| RT-09 | minimal approved payload only | no payload because authorized delivery failed | FAIL |
-| RT-10 | one logical event | zero events | FAIL |
-| RT-11 | stable order | no authorized events | FAIL |
-| RT-12 | revoked access stops future events | no post-rotation events, but subscription never validated | FAIL |
-| RT-13 | zero cross-tenant leakage | zero cross-tenant topic events | PASS |
-| RT-14 | reconnect safe and documented | reconnect authorization failed | FAIL |
+| RT-01 | exactly one event delivered | one notification payload delivered | PASS |
+| RT-02 | no event delivered | no foreign notification event | PASS |
+| RT-03 | no event delivered | unrelated notification subscriber received nothing | PASS |
+| RT-04 | exactly one approved support payload | one delivered envelope with `errors: ["Error 401: Unauthorized"]` and empty row | FAIL |
+| RT-05 | no event, no envelope, no metadata | zero events on foreign request filter | PASS |
+| RT-06 | no event delivered | unrelated authenticated user received nothing | PASS |
+| RT-07 | no foreign activity discovered | guessed request filter revealed nothing | PASS |
+| RT-08 | only authorized rows on direct read | authorized rows only | PASS |
+| RT-09 | minimal approved payload | no approved payload delivered | FAIL |
+| RT-10 | one logical event | one envelope delivered, but not one authorized row payload | FAIL |
+| RT-11 | stable ordering | ordering could not be validated from approved rows | FAIL |
+| RT-12 | no further event after revocation | revoked resident still received unauthorized envelope | FAIL |
+| RT-13 | zero cross-tenant leakage | concurrent Tenant A subscription received unauthorized envelopes | FAIL |
+| RT-14 | reconnect safe, no foreign replay | reconnect subscription received unauthorized envelope | FAIL |
 
 ---
 
 ## 6. Security assessment
 
-- Notifications remain tenant-safe.
-- Support-message private topics improved enumeration resistance.
-- Direct authenticated reads to `support_messages` were denied in the attempted replacement.
-- The attempted replacement still failed the primary functional security condition because it did not deliver authorized events.
-- No minimized support-message payload can be certified until RT-04 is green.
+- tenant-safe direct reads validated in SQL and runtime read checks;
+- ownership spoofing and mutation were blocked in SQL;
+- unrelated and guessed-filter subscribers remained silent;
+- cross-tenant filtered subscription remained silent;
+- the blocking issue is still unauthorized envelope delivery on the authorized resident subscription path.
+
+This means conversation isolation is still not validated, because the transport is still leaking activity metadata through envelopes.
 
 ---
 
 ## 7. Operational assessment
 
-- Trusted trigger publish path is straightforward.
-- Payload minimization is straightforward.
-- Direct-read denial is straightforward.
-- The blocking behavior is private-topic authorization in the local Realtime runtime.
-- Ordering, duplicate suppression, reconnect semantics and revocation remain unresolved because authorized delivery never validated.
+- delivery semantics for authorized residents remain invalid;
+- duplicate semantics cannot be accepted while the transport returns unauthorized envelopes;
+- ordering cannot be certified without approved row payloads;
+- reconnect remains unsafe for certification for the same reason;
+- observability is sufficient for local diagnosis because the machine-readable probe captures event buffers and negative-event timing.
+
+Future hardening still needed even after the authorization bug is fixed:
+
+- explain why Realtime authorization still diverges from direct row reads;
+- tune the `support_messages` read path away from current sequential scans;
+- document duplicate/idempotency handling after approved row delivery exists.
 
 ---
 
@@ -197,5 +206,5 @@ D2 FAIL — SPRINT 1 BLOCKED
 Smallest next remediation:
 
 ```text
-Implement and validate Option B — denormalized direct ownership predicate for support_messages.
+Trace and correct the remaining Realtime authorization mismatch for support_messages under Option B.
 ```

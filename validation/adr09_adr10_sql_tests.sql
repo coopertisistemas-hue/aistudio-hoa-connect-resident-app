@@ -1,10 +1,10 @@
--- D2 Validation Wave — SQL validation for ADR-09 and ADR-10
+-- D2 Validation Wave B — SQL validation for ADR-09 Option B and ADR-10 retention
 -- Run as postgres against the local Supabase CLI database after validation/d2_setup.sql.
 
 \set ON_ERROR_STOP on
 \pset pager off
 
-\echo '=== ADR-09 / ADR-10 SQL validation ==='
+\echo '=== ADR-09 Option B / ADR-10 SQL validation ==='
 
 \echo ''
 \echo '--- Grant inspection ---'
@@ -64,15 +64,122 @@ WHERE schemaname = 'public'
 ORDER BY tablename, policyname;
 
 \echo ''
-\echo '--- Realtime authorization policies ---'
-SELECT schemaname, tablename, policyname, cmd
-FROM pg_policies
-WHERE schemaname = 'realtime'
-  AND tablename = 'messages'
-ORDER BY policyname;
+\echo '--- DB-01 / DB-02 derived ownership projection ---'
+DO $$
+DECLARE
+  inserted_row public.support_messages%ROWTYPE;
+BEGIN
+  SET LOCAL ROLE authenticated;
+  SET LOCAL request.jwt.claim.sub = '10000000-0000-0000-0000-000000000001';
+  SET LOCAL request.jwt.claim.role = 'authenticated';
+
+  SELECT *
+  INTO inserted_row
+  FROM public.create_support_message(
+    '70000000-0000-0000-0000-000000000001',
+    'Derived ownership message',
+    'resident',
+    '20000000-0000-0000-0000-000000000001',
+    NULL,
+    NULL,
+    NULL,
+    '2026-07-19T10:50:00Z'
+  );
+
+  RAISE NOTICE 'Derived support message tenant_id=% property_id=% resident_profile_id=%',
+    inserted_row.tenant_id, inserted_row.property_id, inserted_row.resident_profile_id;
+
+  IF inserted_row.tenant_id <> '11111111-1111-1111-1111-111111111111'
+     OR inserted_row.property_id <> 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+     OR inserted_row.resident_profile_id <> '20000000-0000-0000-0000-000000000001' THEN
+    RAISE EXCEPTION 'DB-01 / DB-02 FAILED';
+  END IF;
+END $$;
 
 \echo ''
-\echo '--- RT-08 direct table-read boundary as authenticated resident ---'
+\echo '--- DB-03 / DB-04 spoofed ownership ignored ---'
+DO $$
+DECLARE
+  inserted_row public.support_messages%ROWTYPE;
+BEGIN
+  SET LOCAL ROLE authenticated;
+  SET LOCAL request.jwt.claim.sub = '10000000-0000-0000-0000-000000000001';
+  SET LOCAL request.jwt.claim.role = 'authenticated';
+
+  SELECT *
+  INTO inserted_row
+  FROM public.create_support_message(
+    '70000000-0000-0000-0000-000000000001',
+    'Spoof attempt message',
+    'resident',
+    '20000000-0000-0000-0000-000000000001',
+    '22222222-2222-2222-2222-222222222222',
+    '20000000-0000-0000-0000-000000000002',
+    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+    '2026-07-19T10:50:10Z'
+  );
+
+  IF inserted_row.tenant_id <> '11111111-1111-1111-1111-111111111111'
+     OR inserted_row.property_id <> 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+     OR inserted_row.resident_profile_id <> '20000000-0000-0000-0000-000000000001' THEN
+    RAISE EXCEPTION 'DB-03 / DB-04 FAILED';
+  END IF;
+END $$;
+
+\echo ''
+\echo '--- DB-05 ownership mutation denied ---'
+DO $$
+BEGIN
+  BEGIN
+    UPDATE public.support_messages
+    SET tenant_id = '22222222-2222-2222-2222-222222222222'
+    WHERE id = '80000000-0000-0000-0000-000000000001';
+    RAISE EXCEPTION 'DB-05 FAILED: tenant_id mutation unexpectedly succeeded';
+  EXCEPTION
+    WHEN OTHERS THEN
+      RAISE NOTICE 'ownership mutation correctly denied: %', SQLERRM;
+  END;
+END $$;
+
+\echo ''
+\echo '--- DB-06 parent mismatch projection overwritten ---'
+DO $$
+DECLARE
+  inserted_row public.support_messages%ROWTYPE;
+BEGIN
+  INSERT INTO public.support_messages (
+    id,
+    tenant_id,
+    property_id,
+    resident_profile_id,
+    support_request_id,
+    sender_type,
+    sender_profile_id,
+    content,
+    created_at
+  )
+  VALUES (
+    '81000000-0000-0000-0000-000000000001',
+    '22222222-2222-2222-2222-222222222222',
+    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+    '20000000-0000-0000-0000-000000000002',
+    '70000000-0000-0000-0000-000000000001',
+    'association',
+    NULL,
+    'Mismatched ownership insert',
+    '2026-07-19T10:50:20Z'
+  )
+  RETURNING * INTO inserted_row;
+
+  IF inserted_row.tenant_id <> '11111111-1111-1111-1111-111111111111'
+     OR inserted_row.property_id <> 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+     OR inserted_row.resident_profile_id <> '20000000-0000-0000-0000-000000000001' THEN
+    RAISE EXCEPTION 'DB-06 FAILED: parent projection was not enforced';
+  END IF;
+END $$;
+
+\echo ''
+\echo '--- DB-07 direct cross-tenant resident read denied ---'
 DO $$
 DECLARE
   cnt integer;
@@ -81,16 +188,104 @@ BEGIN
   SET LOCAL request.jwt.claim.sub = '10000000-0000-0000-0000-000000000001';
   SET LOCAL request.jwt.claim.role = 'authenticated';
 
-  SELECT COUNT(*) INTO cnt FROM public.notifications;
-  RAISE NOTICE 'notifications visible to Resident A: % (expected 0 before inserts)', cnt;
+  SELECT COUNT(*) INTO cnt
+  FROM public.support_messages
+  WHERE tenant_id = '22222222-2222-2222-2222-222222222222';
 
-  BEGIN
-    PERFORM 1 FROM public.support_messages;
-    RAISE EXCEPTION 'RT-08 FAILED: support_messages SELECT should be denied';
-  EXCEPTION
-    WHEN insufficient_privilege THEN
-      RAISE NOTICE 'support_messages SELECT correctly denied';
-  END;
+  RAISE NOTICE 'Resident A visible Tenant B support messages: % (expected 0)', cnt;
+  IF cnt <> 0 THEN
+    RAISE EXCEPTION 'DB-07 FAILED';
+  END IF;
+END $$;
+
+\echo ''
+\echo '--- DB-08 staff without support permission denied ---'
+DO $$
+DECLARE
+  cnt integer;
+BEGIN
+  SET LOCAL ROLE authenticated;
+  SET LOCAL request.jwt.claim.sub = '10000000-0000-0000-0000-000000000007';
+  SET LOCAL request.jwt.claim.role = 'authenticated';
+
+  SELECT COUNT(*) INTO cnt
+  FROM public.support_messages
+  WHERE tenant_id = '11111111-1111-1111-1111-111111111111';
+
+  RAISE NOTICE 'Viewer role visible support messages: % (expected 0)', cnt;
+  IF cnt <> 0 THEN
+    RAISE EXCEPTION 'DB-08 FAILED';
+  END IF;
+END $$;
+
+\echo ''
+\echo '--- DB-09 authorized staff read allowed ---'
+DO $$
+DECLARE
+  cnt integer;
+BEGIN
+  SET LOCAL ROLE authenticated;
+  SET LOCAL request.jwt.claim.sub = '10000000-0000-0000-0000-000000000004';
+  SET LOCAL request.jwt.claim.role = 'authenticated';
+
+  SELECT COUNT(*) INTO cnt
+  FROM public.support_messages
+  WHERE tenant_id = '11111111-1111-1111-1111-111111111111';
+
+  RAISE NOTICE 'Operator A visible Tenant A support messages: % (expected >= 1)', cnt;
+  IF cnt < 1 THEN
+    RAISE EXCEPTION 'DB-09 FAILED';
+  END IF;
+END $$;
+
+\echo ''
+\echo '--- DB-10 revoked resident membership denies future reads ---'
+DO $$
+DECLARE
+  cnt integer;
+BEGIN
+  UPDATE public.residence_members
+  SET status = 'revoked'
+  WHERE id = '30000000-0000-0000-0000-000000000001';
+
+  SET LOCAL ROLE authenticated;
+  SET LOCAL request.jwt.claim.sub = '10000000-0000-0000-0000-000000000001';
+  SET LOCAL request.jwt.claim.role = 'authenticated';
+
+  SELECT COUNT(*) INTO cnt
+  FROM public.support_messages
+  WHERE tenant_id = '11111111-1111-1111-1111-111111111111';
+
+  RAISE NOTICE 'Resident A visible support messages after revocation: % (expected 0)', cnt;
+  IF cnt <> 0 THEN
+    RAISE EXCEPTION 'DB-10 FAILED';
+  END IF;
+END $$;
+
+\echo ''
+\echo '--- RT-08 direct read boundary as authenticated resident ---'
+DO $$
+DECLARE
+  cnt integer;
+BEGIN
+  UPDATE public.residence_members
+  SET status = 'active'
+  WHERE id = '30000000-0000-0000-0000-000000000001';
+
+  SET LOCAL ROLE authenticated;
+  SET LOCAL request.jwt.claim.sub = '10000000-0000-0000-0000-000000000001';
+  SET LOCAL request.jwt.claim.role = 'authenticated';
+
+  SELECT COUNT(*) INTO cnt FROM public.notifications;
+  RAISE NOTICE 'notifications visible to Resident A: % (expected 0 before runtime inserts)', cnt;
+
+  SELECT COUNT(*) INTO cnt
+  FROM public.support_messages
+  WHERE resident_profile_id = '20000000-0000-0000-0000-000000000001';
+  RAISE NOTICE 'Resident A visible direct support messages: % (expected >= 1)', cnt;
+  IF cnt < 1 THEN
+    RAISE EXCEPTION 'RT-08 FAILED: Resident A should see their own support messages';
+  END IF;
 
   BEGIN
     PERFORM 1 FROM public.tenants;
@@ -131,7 +326,6 @@ BEGIN
   FROM public.profiles
   WHERE id = '20000000-0000-0000-0000-000000000001';
 
-  RAISE NOTICE 'Resident A self profile count: % (expected 1)', cnt;
   IF cnt <> 1 THEN
     RAISE EXCEPTION 'PR-01 FAILED';
   END IF;
@@ -155,7 +349,6 @@ BEGIN
   FROM public.profiles
   WHERE id = '20000000-0000-0000-0000-000000000001';
 
-  RAISE NOTICE 'Resident A preferred_name after update: % (expected Ana Validated)', changed;
   IF changed <> 'Ana Validated' THEN
     RAISE EXCEPTION 'PR-02 FAILED';
   END IF;
@@ -194,7 +387,6 @@ BEGIN
   FROM public.profiles
   WHERE id = '20000000-0000-0000-0000-000000000002';
 
-  RAISE NOTICE 'Resident A access to Resident B profile rows: % (expected 0)', cnt;
   IF cnt <> 0 THEN
     RAISE EXCEPTION 'PR-04 FAILED';
   END IF;
@@ -214,7 +406,6 @@ BEGIN
   FROM public.profiles
   WHERE id = '20000000-0000-0000-0000-000000000001';
 
-  RAISE NOTICE 'Operator A access to Resident A profile rows: % (expected 1)', cnt;
   IF cnt <> 1 THEN
     RAISE EXCEPTION 'PR-05 FAILED';
   END IF;
@@ -234,7 +425,6 @@ BEGIN
   FROM public.profiles
   WHERE id = '20000000-0000-0000-0000-000000000002';
 
-  RAISE NOTICE 'Operator A access to Resident B profile rows: % (expected 0)', cnt;
   IF cnt <> 0 THEN
     RAISE EXCEPTION 'PR-06 FAILED';
   END IF;
@@ -257,7 +447,6 @@ BEGIN
     '20000000-0000-0000-0000-000000000002'
   );
 
-  RAISE NOTICE 'Generic member visible linked resident rows: % (expected 0)', cnt;
   IF cnt <> 0 THEN
     RAISE EXCEPTION 'PR-07 FAILED';
   END IF;
@@ -280,7 +469,6 @@ BEGIN
     '20000000-0000-0000-0000-000000000002'
   );
 
-  RAISE NOTICE 'Unrelated authenticated visible resident rows: % (expected 0)', cnt;
   IF cnt <> 0 THEN
     RAISE EXCEPTION 'PR-08 FAILED';
   END IF;
@@ -314,7 +502,6 @@ BEGIN
   WHERE id = audit_id
     AND actor_user_id = '10000000-0000-0000-0000-000000000006';
 
-  RAISE NOTICE 'Platform admin updated document to % with audit rows %', updated_document, audit_count;
   IF updated_document <> 'CPF-B-CORRECTED' OR audit_count <> 1 THEN
     RAISE EXCEPTION 'PR-09 FAILED';
   END IF;
@@ -334,7 +521,6 @@ BEGIN
   SELECT COUNT(*) INTO cnt
   FROM public.profile_contacts
   WHERE profile_id = '20000000-0000-0000-0000-000000000001';
-  RAISE NOTICE 'Resident A self contact rows: % (expected 1)', cnt;
   IF cnt <> 1 THEN
     RAISE EXCEPTION 'PR-12 FAILED: self contact read';
   END IF;
@@ -342,7 +528,6 @@ BEGIN
   SELECT COUNT(*) INTO cnt
   FROM public.profile_contacts
   WHERE profile_id = '20000000-0000-0000-0000-000000000002';
-  RAISE NOTICE 'Resident A access to Resident B contacts: % (expected 0)', cnt;
   IF cnt <> 0 THEN
     RAISE EXCEPTION 'PR-12 FAILED: cross-tenant contact read';
   END IF;
@@ -362,7 +547,6 @@ BEGIN
   FROM public.profile_contacts
   WHERE id = '60000000-0000-0000-0000-000000000001';
 
-  RAISE NOTICE 'Operator A updated verification_state to % (expected verified)', new_state;
   IF new_state <> 'verified' THEN
     RAISE EXCEPTION 'PR-12 FAILED: operator verification update';
   END IF;
@@ -387,26 +571,23 @@ WHERE schemaname = 'public'
 ORDER BY tablename, indexname;
 
 EXPLAIN (COSTS OFF)
-SELECT p.id
-FROM public.profiles AS p
-WHERE EXISTS (
-  SELECT 1
-  FROM public.residence_members AS rm
-  JOIN public.properties AS pr
-    ON pr.id = rm.property_id
-  JOIN public.tenant_members AS tm
-    ON tm.tenant_id = pr.tenant_id
-  WHERE rm.profile_id = p.id
-    AND rm.status = 'active'
-    AND tm.user_id = '10000000-0000-0000-0000-000000000004'
-    AND tm.status = 'active'
-    AND tm.role IN ('admin', 'manager', 'operator')
-);
+SELECT sm.id
+FROM public.support_messages AS sm
+WHERE sm.tenant_id = '11111111-1111-1111-1111-111111111111'
+  AND sm.resident_profile_id = '20000000-0000-0000-0000-000000000001'
+ORDER BY sm.created_at, sm.id;
 
 EXPLAIN (COSTS OFF)
-SELECT sr.id
-FROM public.support_requests AS sr
-WHERE sr.realtime_topic = 'support-request:3cdb6d1e7d8a4bb08f9e18c2d53f6a41';
+SELECT sm.id
+FROM public.support_messages AS sm
+WHERE sm.support_request_id = '70000000-0000-0000-0000-000000000001'
+ORDER BY sm.created_at, sm.id;
+
+EXPLAIN (COSTS OFF)
+SELECT sm.id
+FROM public.support_messages AS sm
+WHERE sm.tenant_id = '22222222-2222-2222-2222-222222222222'
+  AND sm.resident_profile_id = '20000000-0000-0000-0000-000000000001';
 
 \echo ''
-\echo '=== ADR-09 / ADR-10 SQL validation completed ==='
+\echo '=== ADR-09 Option B / ADR-10 SQL validation completed ==='

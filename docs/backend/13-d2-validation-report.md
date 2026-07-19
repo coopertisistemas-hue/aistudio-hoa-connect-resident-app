@@ -1,7 +1,7 @@
 # 13 — D2 Validation Report
 
 > Backend Integration Program — D2 Validation Gate Wave  
-> Updated on July 19, 2026 after the Realtime remediation rerun
+> Updated on July 19, 2026 after Option B revalidation
 
 ---
 
@@ -17,11 +17,11 @@ Blocking item:
 ADR-09 support_messages realtime isolation unresolved
 ```
 
-Previously validated and retained:
+Retained as validated:
 
-- ADR-10 — PASS
-- ADR-11 — PASS
-- notifications realtime narrow-grant model — PASS
+- `notifications` Realtime;
+- ADR-10 profile authorization;
+- ADR-11 frontend error compatibility.
 
 ---
 
@@ -31,144 +31,165 @@ Previously validated and retained:
 |---|---|
 | Repository | `aistudio-hoa-connect-resident-app` |
 | Branch | `d2-validation-wave` |
-| Validation date | **July 19, 2026** |
-| Supabase project reference | local CLI project `aistudio-hoa-connect-resident-app` |
+| Validation date | July 19, 2026 |
+| Local project | Supabase CLI stack for `aistudio-hoa-connect-resident-app` |
 | API URL | `http://127.0.0.1:54331` |
 | DB URL | `127.0.0.1:54332` |
 | Supabase CLI | `v2.107.0` |
-| Postgres image | `public.ecr.aws/supabase/postgres:17.6.1.136` |
-| Realtime image | `public.ecr.aws/supabase/realtime:v2.107.5` |
-| Proof of isolation | loopback-only endpoints; repo-local `supabase/config.toml`; no hosted project refs; no production credentials |
+| Postgres | PostgreSQL `17.6` in local Supabase container |
+| Realtime | `public.ecr.aws/supabase/realtime:v2.107.5` |
+| Proof of isolation | loopback-only endpoints, repo-local stack, no hosted project refs, no production credentials |
 
 Reset procedure used:
 
-1. `validation/d2_setup.sql`
-2. optional settle wait for local Realtime warm-up
-3. `validation/adr09_adr10_sql_tests.sql`
-4. `validation/adr09_adr10_runtime_probe.mjs`
+1. run `validation/d2_setup.sql`
+2. run `validation/adr09_adr10_sql_tests.sql`
+3. run `validation/adr09_adr10_runtime_probe.mjs`
 
 ---
 
-## 3. Remediation rerun summary
+## 3. Wave B summary
 
-The remediation wave tested **Option A — Private Broadcast** for `support_messages` while keeping `notifications` on the already-validated `postgres_changes + narrow SELECT + RLS` path.
+This remediation wave implemented and validated Option B for `support_messages`:
 
-Validation-only artifacts:
+```text
+postgres_changes
++ narrow SELECT grant
++ direct denormalized ownership
++ immutable server-derived authorization fields
++ direct indexed-intended RLS predicate
+```
+
+Artifacts:
 
 - [validation/d2_setup.sql](/home/ubuntu/projects/connect/03-products/hoa-connect/aistudio-hoa-connect-resident-app/validation/d2_setup.sql)
 - [validation/adr09_adr10_sql_tests.sql](/home/ubuntu/projects/connect/03-products/hoa-connect/aistudio-hoa-connect-resident-app/validation/adr09_adr10_sql_tests.sql)
 - [validation/adr09_adr10_runtime_probe.mjs](/home/ubuntu/projects/connect/03-products/hoa-connect/aistudio-hoa-connect-resident-app/validation/adr09_adr10_runtime_probe.mjs)
-- [validation/evidence/adr09_support_messages_broadcast_probe.json](/home/ubuntu/projects/connect/03-products/hoa-connect/aistudio-hoa-connect-resident-app/validation/evidence/adr09_support_messages_broadcast_probe.json)
+- [validation/evidence/adr09_support_messages_option_b_probe.json](/home/ubuntu/projects/connect/03-products/hoa-connect/aistudio-hoa-connect-resident-app/validation/evidence/adr09_support_messages_option_b_probe.json)
 
-Key implementation facts:
-
-- `support_messages` was removed from `supabase_realtime` publication;
-- direct authenticated `SELECT` on `support_messages` was revoked;
-- opaque topic `support-request:<non-guessable-id>` was introduced on `support_requests`;
-- a trusted trigger published minimized payloads through `realtime.send(...)`;
-- `realtime.messages` RLS was added for topic authorization and constrained join probing.
-
-Observed Realtime join-probe shape from the local stack:
-
-```text
-topic=<requested topic>
-extension=broadcast
-event=NULL
-payload=NULL
-private=false
-```
-
-Even after matching that probe shape, authorized private-topic joins still failed.
+Private Broadcast remains a rejected alternative. It is not the selected architecture.
 
 ---
 
-## 4. ADR-09 runtime matrix
+## 4. SQL validation summary
+
+`support_messages` Option B controls passed in the local validation schema:
+
+- DB-01 derived tenant: PASS
+- DB-02 derived resident owner: PASS
+- DB-03 spoofed tenant: PASS
+- DB-04 spoofed resident: PASS
+- DB-05 ownership mutation denied: PASS
+- DB-06 parent mismatch projection enforcement: PASS
+- DB-07 direct cross-tenant resident read denied: PASS
+- DB-08 staff without support permission denied: PASS
+- DB-09 authorized staff read allowed: PASS
+- DB-10 revoked membership future reads denied: PASS
+
+SQL totals for Option B support-message controls:
+
+```text
+10 passed
+0 failed
+```
+
+Additional retained SQL checks:
+
+- RT-08 direct read boundary through PostgREST-compatible access: PASS
+- ADR-10 validation remained green in the same suite
+
+---
+
+## 5. Runtime matrix
 
 | Case | Expected | Actual | Result |
 |---|---|---|---|
-| RT-01 | exactly one authorized notification event | one notification event delivered | PASS |
-| RT-02 | no Tenant B notification to Resident A | no foreign notification payload; no security leak | PASS |
-| RT-03 | unrelated authenticated user receives nothing | zero notification events | PASS |
-| RT-04 | authorized support participant receives one event | `CHANNEL_ERROR`, zero events, zero payload | FAIL |
-| RT-05 | foreign conversation yields no event or envelope | no event payload, but authorized path never validated | FAIL |
-| RT-06 | unrelated authenticated user denied or receives zero events | unauthorized private-topic join rejected | PASS |
-| RT-07 | guessed opaque topic reveals nothing | guessed topic rejected / timed out with zero events | PASS |
-| RT-08 | direct table read matches revised ADR | `403 permission denied for table support_messages` | PASS |
-| RT-09 | payload contains approved minimal fields only | no payload because authorized delivery failed | FAIL |
-| RT-10 | one logical event for one insert | zero events | FAIL |
-| RT-11 | stable reconstructable order | authorized join failed; no ordering evidence | FAIL |
-| RT-12 | revoked user receives no further events | no post-revocation events, but precondition subscription never validated | FAIL |
-| RT-13 | zero cross-tenant leakage | foreign tenant topic produced zero events | PASS |
-| RT-14 | reconnect produces no foreign leak and no unintended replay | reconnect authorization failed | FAIL |
+| RT-01 | exactly one notification event | one notification event delivered | PASS |
+| RT-02 | no cross-tenant notification | zero foreign notification events | PASS |
+| RT-03 | unrelated user receives nothing | zero notification events | PASS |
+| RT-04 | exactly one authorized support event payload | one delivered envelope, but `new = {}` with `Error 401: Unauthorized` | FAIL |
+| RT-05 | foreign support message yields no event or envelope | zero events | PASS |
+| RT-06 | unrelated authenticated user receives nothing | zero events | PASS |
+| RT-07 | guessed request filter reveals nothing | zero events | PASS |
+| RT-08 | authenticated direct reads return only authorized rows | authorized rows only | PASS |
+| RT-09 | minimal approved payload only | no approved payload delivered; only unauthorized envelope on RT-04 | FAIL |
+| RT-10 | one logical event for one insert | one delivered object, but it was an unauthorized envelope rather than a valid row payload | FAIL |
+| RT-11 | stable ordering from approved fields | no approved rows delivered for ordering validation | FAIL |
+| RT-12 | revocation stops future delivery | revoked resident still received an unauthorized envelope | FAIL |
+| RT-13 | concurrent tenant subscriptions stay isolated | Tenant A received unauthorized envelopes during concurrent run; Tenant B received its own row | FAIL |
+| RT-14 | reconnect yields no foreign leak and no unexpected replay | reconnect subscription received an unauthorized envelope | FAIL |
 
-Primary failure evidence from the runtime probe:
+Primary failure evidence:
 
-```text
-RT-04 failed: Resident A support subscription did not authorize (CHANNEL_ERROR)
+```json
+{
+  "schema": "public",
+  "table": "support_messages",
+  "eventType": "INSERT",
+  "new": {},
+  "old": {},
+  "errors": ["Error 401: Unauthorized"]
+}
 ```
 
-and the Realtime service logged:
-
-```text
-Unauthorized: You do not have permissions to read from this Channel topic: support-request:3cdb6d1e...
-```
-
----
-
-## 5. ADR conclusions
-
-### ADR-09
-
-Notifications remain validated.
-
-Support messages remain **not validated**:
-
-- the original `postgres_changes` design failed because foreign event envelopes were delivered;
-- the private-Broadcast replacement failed because authorized subscribers could not be validated end to end in the local runtime.
-
-### ADR-10
-
-Retained as previously validated. No new ADR-10 finding was opened in this wave.
-
-### ADR-11
-
-Retained as previously validated. No new ADR-11 finding was opened in this wave.
+That remains a failed isolation result.
 
 ---
 
 ## 6. Security assessment
 
-- Tenant isolation for notifications remains green.
-- Support-message unauthorized joins were rejected, which is good, but that is insufficient because the authorized join also failed.
-- Topic enumeration resistance improved with opaque topic IDs, but the transport is still unusable because RT-04 is red.
-- Direct authenticated reads to `support_messages` stayed denied in the private-Broadcast attempt.
-- No validated minimized support-message payload exists because no authorized delivery exists.
+- `notifications` remains green.
+- Direct table reads for `support_messages` remained tenant-safe under RLS.
+- Ownership fields were server-derived and immutable in the validation model.
+- Foreign filtered subscriptions and unrelated users were silent.
+- The decisive failure is still the authorized resident path receiving unauthorized envelopes instead of row payloads.
+- Revocation and reconnect cases are also red because the same envelope behavior persists.
 
 ---
 
-## 7. Operational assessment
+## 7. Performance assessment
 
-- Trusted trigger publishing is easy to maintain.
-- Payload shaping and direct-read denial are straightforward in the attempted design.
-- The blocking behavior is private-topic authorization in the local Realtime runtime.
-- Reconnect, ordering, duplicate suppression and revocation cannot be accepted until authorized delivery works first.
+The local validation plans on July 19, 2026 were not yet satisfactory:
+
+- resident read by `tenant_id + resident_profile_id`: `Seq Scan`
+- request read by `support_request_id`: `Seq Scan`
+- cross-tenant denial path: `Seq Scan`
+
+This is a readiness concern, but not the D2 blocking item. D2 remains blocked on Realtime isolation and authorized delivery first.
 
 ---
 
-## 8. Smallest next remediation
+## 8. ADR conclusions
+
+### ADR-09
+
+- `notifications`: retained and validated
+- `support_messages`: Option B SQL model validated, Realtime transport still not validated
+
+### ADR-10
+
+Retained as previously validated.
+
+### ADR-11
+
+Retained as previously validated.
+
+---
+
+## 9. Smallest next remediation
 
 ```text
-Implement and validate Option B — denormalized direct ownership predicate for support_messages.
+Trace and correct the remaining Realtime authorization mismatch for support_messages under the Option B schema.
 ```
 
-Reason:
+That is smaller than another transport redesign because:
 
-- Option A private Broadcast was exercised with runtime evidence and still did not validate the authorized subscriber path.
-- ADR-10 and ADR-11 are already green and should remain untouched.
+- ownership derivation and immutability already validate in SQL;
+- the runtime failure still manifests as `Error 401: Unauthorized` envelopes on rows that should authorize for the resident subscriber.
 
 ---
 
-## 9. Final verdict
+## 10. Final verdict
 
 ```text
 D2 FAIL — SPRINT 1 BLOCKED

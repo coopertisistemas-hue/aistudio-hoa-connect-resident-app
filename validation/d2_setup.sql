@@ -1,10 +1,9 @@
--- D2 Validation Wave — isolated local schema setup
+-- D2 Validation Wave B — isolated local schema setup
 -- Environment: local Supabase CLI project_id aistudio-hoa-connect-resident-app
 -- Safety: local-only, disposable, non-production. Do not run against a hosted project.
 
 \set ON_ERROR_STOP on
 
--- Clean slate for idempotent re-runs
 DROP TABLE IF EXISTS public.profile_correction_audit CASCADE;
 DROP TABLE IF EXISTS public.support_messages CASCADE;
 DROP TABLE IF EXISTS public.support_requests CASCADE;
@@ -22,13 +21,12 @@ DROP FUNCTION IF EXISTS public.is_platform_admin() CASCADE;
 DROP FUNCTION IF EXISTS public.is_tenant_member(uuid) CASCADE;
 DROP FUNCTION IF EXISTS public.is_authorized_operator(uuid) CASCADE;
 DROP FUNCTION IF EXISTS public.is_support_request_author(uuid) CASCADE;
-DROP FUNCTION IF EXISTS public.generate_support_request_topic() CASCADE;
-DROP FUNCTION IF EXISTS public.can_access_support_request_topic(text) CASCADE;
-DROP FUNCTION IF EXISTS public.rotate_support_request_topic(uuid) CASCADE;
-DROP FUNCTION IF EXISTS public.broadcast_support_message() CASCADE;
+DROP FUNCTION IF EXISTS public.is_active_resident_support_participant(uuid, uuid, uuid) CASCADE;
+DROP FUNCTION IF EXISTS public.derive_support_message_ownership() CASCADE;
+DROP FUNCTION IF EXISTS public.enforce_support_message_immutability() CASCADE;
+DROP FUNCTION IF EXISTS public.sync_support_message_resident_access() CASCADE;
+DROP FUNCTION IF EXISTS public.create_support_message(uuid, text, text, uuid, uuid, uuid, uuid, timestamptz) CASCADE;
 DROP FUNCTION IF EXISTS public.apply_profile_correction(uuid, text, text) CASCADE;
-
-DROP POLICY IF EXISTS support_messages_broadcast_select_policy ON realtime.messages;
 
 DO $$
 BEGIN
@@ -145,22 +143,33 @@ CREATE TABLE public.support_requests (
   tenant_id uuid NOT NULL REFERENCES public.tenants(id),
   property_id uuid NOT NULL REFERENCES public.properties(id),
   profile_id uuid NOT NULL REFERENCES public.profiles(id),
-  realtime_topic text NOT NULL UNIQUE,
   protocol text NOT NULL,
   category text NOT NULL,
   status text NOT NULL DEFAULT 'submitted',
   subject text NOT NULL,
-  created_at timestamptz NOT NULL DEFAULT now()
+  created_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT support_requests_identity_projection UNIQUE (id, tenant_id, property_id, profile_id)
 );
 
 CREATE TABLE public.support_messages (
   id uuid PRIMARY KEY,
-  support_request_id uuid NOT NULL REFERENCES public.support_requests(id),
+  tenant_id uuid NOT NULL REFERENCES public.tenants(id),
+  property_id uuid NOT NULL REFERENCES public.properties(id),
+  resident_profile_id uuid NOT NULL REFERENCES public.profiles(id),
+  resident_user_id uuid NOT NULL,
+  resident_access_revoked boolean NOT NULL DEFAULT false,
+  support_request_id uuid NOT NULL,
   delivery_sequence bigint GENERATED ALWAYS AS IDENTITY,
   sender_type text NOT NULL CHECK (sender_type IN ('resident', 'association', 'system')),
   sender_profile_id uuid REFERENCES public.profiles(id),
   content text NOT NULL,
-  created_at timestamptz NOT NULL DEFAULT now()
+  created_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT support_messages_request_fk
+    FOREIGN KEY (support_request_id)
+    REFERENCES public.support_requests(id),
+  CONSTRAINT support_messages_identity_projection_fk
+    FOREIGN KEY (support_request_id, tenant_id, property_id, resident_profile_id)
+    REFERENCES public.support_requests(id, tenant_id, property_id, profile_id)
 );
 
 CREATE TABLE public.profile_correction_audit (
@@ -249,17 +258,11 @@ AS $$
   );
 $$;
 
-CREATE OR REPLACE FUNCTION public.generate_support_request_topic()
-RETURNS text
-LANGUAGE sql
-VOLATILE
-SECURITY DEFINER
-SET search_path = ''
-AS $$
-  SELECT 'support-request:' || md5(random()::text || clock_timestamp()::text || txid_current()::text);
-$$;
-
-CREATE OR REPLACE FUNCTION public.can_access_support_request_topic(target_topic text)
+CREATE OR REPLACE FUNCTION public.is_active_resident_support_participant(
+  target_tenant_id uuid,
+  target_property_id uuid,
+  target_profile_id uuid
+)
 RETURNS boolean
 LANGUAGE sql
 STABLE
@@ -268,83 +271,177 @@ SET search_path = ''
 AS $$
   SELECT EXISTS (
     SELECT 1
-    FROM public.support_requests AS sr
-    WHERE sr.realtime_topic = target_topic
-      AND (
-        (
-          sr.profile_id = public.current_profile_id()
-          AND EXISTS (
-            SELECT 1
-            FROM public.residence_members AS rm
-            WHERE rm.tenant_id = sr.tenant_id
-              AND rm.property_id = sr.property_id
-              AND rm.profile_id = sr.profile_id
-              AND rm.status = 'active'
-          )
-        )
-        OR public.is_authorized_operator(sr.tenant_id)
-        OR public.is_platform_admin()
-      )
+    FROM public.residence_members AS rm
+    WHERE rm.tenant_id = target_tenant_id
+      AND rm.property_id = target_property_id
+      AND rm.profile_id = target_profile_id
+      AND rm.status = 'active'
   );
 $$;
 
-CREATE OR REPLACE FUNCTION public.rotate_support_request_topic(target_request_id uuid)
-RETURNS text
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = ''
-AS $$
-DECLARE
-  next_topic text;
-BEGIN
-  next_topic := public.generate_support_request_topic();
-
-  UPDATE public.support_requests
-  SET realtime_topic = next_topic
-  WHERE id = target_request_id;
-
-  IF NOT FOUND THEN
-    RAISE EXCEPTION 'support request not found';
-  END IF;
-
-  RETURN next_topic;
-END;
-$$;
-
-CREATE OR REPLACE FUNCTION public.broadcast_support_message()
+CREATE OR REPLACE FUNCTION public.derive_support_message_ownership()
 RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
 AS $$
 DECLARE
-  target_topic text;
+  parent_request public.support_requests%ROWTYPE;
+  resident_user uuid;
 BEGIN
-  SELECT sr.realtime_topic
-  INTO target_topic
-  FROM public.support_requests AS sr
-  WHERE sr.id = NEW.support_request_id;
+  SELECT *
+  INTO parent_request
+  FROM public.support_requests
+  WHERE id = NEW.support_request_id;
 
-  IF target_topic IS NULL THEN
-    RAISE EXCEPTION 'support request realtime topic missing for %', NEW.support_request_id;
+  IF parent_request.id IS NULL THEN
+    RAISE EXCEPTION 'support request not found';
   END IF;
 
-  PERFORM realtime.send(
-    jsonb_build_object(
-      'message_id', NEW.id,
-      'conversation_topic', target_topic,
-      'sender_category', NEW.sender_type,
-      'body', NEW.content,
-      'created_at', NEW.created_at,
-      'has_attachments', false,
-      'sequence', NEW.delivery_sequence
-    ),
-    'support_message.created',
-    target_topic,
-    true
+  NEW.tenant_id := parent_request.tenant_id;
+  NEW.property_id := parent_request.property_id;
+  NEW.resident_profile_id := parent_request.profile_id;
+  SELECT p.user_id
+  INTO resident_user
+  FROM public.profiles AS p
+  WHERE p.id = parent_request.profile_id;
+
+  IF resident_user IS NULL THEN
+    RAISE EXCEPTION 'resident user not found';
+  END IF;
+
+  NEW.resident_user_id := resident_user;
+  NEW.resident_access_revoked := NOT public.is_active_resident_support_participant(
+    parent_request.tenant_id,
+    parent_request.property_id,
+    parent_request.profile_id
   );
 
-  RETURN NULL;
+  RETURN NEW;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.enforce_support_message_immutability()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+  IF NEW.tenant_id IS DISTINCT FROM OLD.tenant_id THEN
+    RAISE EXCEPTION 'tenant_id is immutable';
+  END IF;
+
+  IF NEW.property_id IS DISTINCT FROM OLD.property_id THEN
+    RAISE EXCEPTION 'property_id is immutable';
+  END IF;
+
+  IF NEW.resident_profile_id IS DISTINCT FROM OLD.resident_profile_id THEN
+    RAISE EXCEPTION 'resident_profile_id is immutable';
+  END IF;
+
+  IF NEW.support_request_id IS DISTINCT FROM OLD.support_request_id THEN
+    RAISE EXCEPTION 'support_request_id is immutable';
+  END IF;
+
+  IF NEW.resident_user_id IS DISTINCT FROM OLD.resident_user_id THEN
+    RAISE EXCEPTION 'resident_user_id is immutable';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.sync_support_message_resident_access()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+  UPDATE public.support_messages
+  SET resident_access_revoked = (NEW.status <> 'active')
+  WHERE tenant_id = NEW.tenant_id
+    AND property_id = NEW.property_id
+    AND resident_profile_id = NEW.profile_id;
+
+  RETURN NEW;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.create_support_message(
+  target_support_request_id uuid,
+  target_content text,
+  target_sender_type text DEFAULT 'resident',
+  target_sender_profile_id uuid DEFAULT NULL,
+  requested_tenant_id uuid DEFAULT NULL,
+  requested_resident_profile_id uuid DEFAULT NULL,
+  requested_property_id uuid DEFAULT NULL,
+  target_created_at timestamptz DEFAULT now()
+)
+RETURNS public.support_messages
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  parent_request public.support_requests%ROWTYPE;
+  inserted_row public.support_messages%ROWTYPE;
+BEGIN
+  SELECT *
+  INTO parent_request
+  FROM public.support_requests
+  WHERE id = target_support_request_id;
+
+  IF parent_request.id IS NULL THEN
+    RAISE EXCEPTION 'support request not found';
+  END IF;
+
+  IF target_sender_type = 'resident' THEN
+    IF parent_request.profile_id <> public.current_profile_id() THEN
+      RAISE EXCEPTION 'resident support request access denied';
+    END IF;
+
+    IF NOT public.is_active_resident_support_participant(parent_request.tenant_id, parent_request.property_id, parent_request.profile_id) THEN
+      RAISE EXCEPTION 'resident support request relationship inactive';
+    END IF;
+  ELSIF target_sender_type = 'association' THEN
+    IF NOT (public.is_authorized_operator(parent_request.tenant_id) OR public.is_platform_admin()) THEN
+      RAISE EXCEPTION 'operator support request access denied';
+    END IF;
+  ELSIF target_sender_type = 'system' THEN
+    IF NOT public.is_platform_admin() THEN
+      RAISE EXCEPTION 'system support message access denied';
+    END IF;
+  ELSE
+    RAISE EXCEPTION 'unsupported sender_type %', target_sender_type;
+  END IF;
+
+  INSERT INTO public.support_messages (
+    id,
+    tenant_id,
+    property_id,
+    resident_profile_id,
+    support_request_id,
+    sender_type,
+    sender_profile_id,
+    content,
+    created_at
+  )
+  VALUES (
+    gen_random_uuid(),
+    requested_tenant_id,
+    requested_property_id,
+    requested_resident_profile_id,
+    target_support_request_id,
+    target_sender_type,
+    target_sender_profile_id,
+    target_content,
+    target_created_at
+  )
+  RETURNING * INTO inserted_row;
+
+  RETURN inserted_row;
 END;
 $$;
 
@@ -412,8 +509,9 @@ CREATE INDEX idx_residence_members_profile_active ON public.residence_members(pr
 CREATE INDEX idx_residence_members_property_active ON public.residence_members(property_id) WHERE status = 'active';
 CREATE INDEX idx_notifications_profile_created ON public.notifications(profile_id, created_at DESC);
 CREATE INDEX idx_support_requests_profile ON public.support_requests(profile_id);
-CREATE INDEX idx_support_requests_realtime_topic ON public.support_requests(realtime_topic);
-CREATE INDEX idx_support_messages_request_sequence ON public.support_messages(support_request_id, delivery_sequence);
+CREATE INDEX idx_support_messages_tenant_resident_created ON public.support_messages(tenant_id, resident_profile_id, created_at, id);
+CREATE INDEX idx_support_messages_resident_user_active_created ON public.support_messages(resident_user_id, resident_access_revoked, created_at, id);
+CREATE INDEX idx_support_messages_request_created ON public.support_messages(support_request_id, created_at, id);
 
 ALTER TABLE public.tenants ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.properties ENABLE ROW LEVEL SECURITY;
@@ -594,31 +692,31 @@ ON public.support_requests
 FOR SELECT
 USING (profile_id = public.current_profile_id());
 
+CREATE POLICY support_messages_select_resident_policy
+ON public.support_messages
+FOR SELECT
+TO authenticated
+USING (
+  resident_user_id = auth.uid()
+  AND resident_access_revoked = false
+);
+
+CREATE POLICY support_messages_select_operator_policy
+ON public.support_messages
+FOR SELECT
+TO authenticated
+USING (public.is_authorized_operator(tenant_id));
+
+CREATE POLICY support_messages_select_platform_admin_policy
+ON public.support_messages
+FOR SELECT
+TO authenticated
+USING (public.is_platform_admin());
+
 CREATE POLICY profile_correction_audit_select_platform_admin_policy
 ON public.profile_correction_audit
 FOR SELECT
 USING (public.is_platform_admin());
-
-CREATE POLICY support_messages_broadcast_select_policy
-ON realtime.messages
-FOR SELECT
-TO authenticated
-USING (
-  public.can_access_support_request_topic(realtime.topic())
-);
-
-CREATE POLICY support_messages_broadcast_probe_insert_policy
-ON realtime.messages
-FOR INSERT
-TO authenticated
-WITH CHECK (
-  public.can_access_support_request_topic(topic)
-  AND extension = 'broadcast'
-  AND event IS NULL
-  AND payload IS NULL
-  AND private = false
-  AND binary_payload IS NULL
-);
 
 DO $$
 BEGIN
@@ -643,12 +741,22 @@ BEGIN
   END IF;
 END $$;
 
-ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications, public.support_messages;
 
-CREATE TRIGGER broadcast_support_message_after_insert
-AFTER INSERT ON public.support_messages
+CREATE TRIGGER derive_support_message_ownership_before_insert
+BEFORE INSERT ON public.support_messages
 FOR EACH ROW
-EXECUTE FUNCTION public.broadcast_support_message();
+EXECUTE FUNCTION public.derive_support_message_ownership();
+
+CREATE TRIGGER enforce_support_message_immutability_before_update
+BEFORE UPDATE ON public.support_messages
+FOR EACH ROW
+EXECUTE FUNCTION public.enforce_support_message_immutability();
+
+CREATE TRIGGER sync_support_message_resident_access_after_membership_change
+AFTER UPDATE OF status ON public.residence_members
+FOR EACH ROW
+EXECUTE FUNCTION public.sync_support_message_resident_access();
 
 REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon, authenticated;
 REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM anon, authenticated;
@@ -656,11 +764,13 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES FROM anon, authen
 
 GRANT USAGE ON SCHEMA public TO anon, authenticated;
 GRANT SELECT ON public.notifications TO authenticated;
+GRANT SELECT ON public.support_messages TO authenticated;
+GRANT EXECUTE ON FUNCTION public.create_support_message(uuid, text, text, uuid, uuid, uuid, uuid, timestamptz) TO authenticated;
 
 GRANT USAGE ON SCHEMA public TO profile_read_test, profile_self_update_test, operator_contact_test, platform_admin_test;
 
 GRANT SELECT ON public.tenants, public.properties, public.profiles, public.profile_contacts,
-  public.tenant_members, public.platform_admins, public.residence_members, public.profile_correction_audit
+  public.tenant_members, public.platform_admins, public.residence_members, public.profile_correction_audit, public.support_messages
 TO profile_read_test, profile_self_update_test, operator_contact_test, platform_admin_test;
 
 GRANT USAGE ON SCHEMA auth TO profile_read_test, profile_self_update_test, operator_contact_test, platform_admin_test;
@@ -710,9 +820,9 @@ INSERT INTO public.profile_contacts (id, profile_id, contact_type, normalized_va
   ('60000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000001', 'primary_email', 'resident.a@example.com', 'resident.a@example.com', 'verified', '{"invoiceDelivery":"email"}'),
   ('60000000-0000-0000-0000-000000000002', '20000000-0000-0000-0000-000000000002', 'primary_email', 'resident.b@example.com', 'resident.b@example.com', 'pending', '{"invoiceDelivery":"whatsapp"}');
 
-INSERT INTO public.support_requests (id, tenant_id, property_id, profile_id, realtime_topic, protocol, category, subject) VALUES
-  ('70000000-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '20000000-0000-0000-0000-000000000001', 'support-request:3cdb6d1e7d8a4bb08f9e18c2d53f6a41', 'SUP-A-001', 'other', 'Support request A'),
-  ('70000000-0000-0000-0000-000000000002', '22222222-2222-2222-2222-222222222222', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '20000000-0000-0000-0000-000000000002', 'support-request:b4f8c61e2d3047f68b7c95e1a2fd4e73', 'SUP-B-001', 'other', 'Support request B');
+INSERT INTO public.support_requests (id, tenant_id, property_id, profile_id, protocol, category, subject) VALUES
+  ('70000000-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '20000000-0000-0000-0000-000000000001', 'SUP-A-001', 'other', 'Support request A'),
+  ('70000000-0000-0000-0000-000000000002', '22222222-2222-2222-2222-222222222222', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '20000000-0000-0000-0000-000000000002', 'SUP-B-001', 'other', 'Support request B');
 
 INSERT INTO public.support_messages (id, support_request_id, sender_type, sender_profile_id, content, created_at) VALUES
   ('80000000-0000-0000-0000-000000000001', '70000000-0000-0000-0000-000000000001', 'resident', '20000000-0000-0000-0000-000000000001', 'Initial message A', '2026-07-19T09:00:00Z');

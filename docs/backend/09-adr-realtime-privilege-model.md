@@ -2,34 +2,34 @@
 
 ## Status
 
-**Notifications path retained. Support-messages path unresolved after remediation validation on July 19, 2026.**
+**Notifications retained. `support_messages` remains blocked after Option B runtime revalidation on July 19, 2026.**
 
-Dependent on ADR-07. ADR-10 and ADR-11 remain validated and unchanged.
+ADR-10 and ADR-11 remain validated and unchanged.
 
 ---
 
 ## Context
 
-The Resident App needs Realtime for two different surfaces:
+The Resident App uses Realtime for two different modules:
 
 - `notifications`
 - `support_messages`
 
-These surfaces no longer share one validated transport model.
+They do not share the same validated behavior.
 
 ---
 
 ## Failed assumption
 
-The original July 19, 2026 D2 validation accepted one uniform model:
+The original uniform decision was:
 
 ```text
 postgres_changes + narrow SELECT grant + RLS
 ```
 
-That remained valid for `notifications`, but failed for `support_messages`.
+That remains valid for `notifications`, but failed for `support_messages`.
 
-Runtime evidence from the first D2 validation wave:
+First D2 failure evidence:
 
 ```json
 {
@@ -42,15 +42,17 @@ Runtime evidence from the first D2 validation wave:
 }
 ```
 
-That envelope was delivered to a resident who was not authorized for the foreign conversation.
+That envelope is still a failure because the subscriber learned a foreign write occurred. Required outcome:
 
-`401 inside an event` is still a failed isolation outcome because the subscriber learned that a foreign write occurred.
+```text
+no event delivered
+```
 
 ---
 
 ## Notifications
 
-### Retained model
+### Retained transport
 
 ```text
 postgres_changes + narrow SELECT grant + RLS
@@ -69,110 +71,181 @@ GRANT SELECT ON public.notifications TO authenticated;
 ### Authorization model
 
 - `authenticated` receives `SELECT` on `notifications` only.
-- RLS constrains visibility to `profile_id = current_profile_id()`.
+- RLS limits visibility to the caller's own `profile_id`.
 - No write grants are restored.
 
-### Validation state
+### Runtime validation
 
-Retained as **validated** from the D2 validation wave and re-observed during the remediation rerun:
+Retained as validated:
 
-- authorized notification delivered;
-- unrelated authenticated user received nothing;
-- broad grants remained revoked.
+- authorized notification event delivered;
+- cross-tenant notification not delivered;
+- unrelated authenticated user received nothing.
 
 ---
 
 ## Support Messages
 
-### Options evaluated
+### Runtime-tested alternatives
 
-#### Option A — Private Broadcast
+#### Rejected alternative A — Private Broadcast
 
-Attempted design:
+Evaluated previously and rejected because the authorized subscriber path failed at runtime.
 
 ```text
 support_messages INSERT
-→ trusted trigger
-→ realtime.send(...)
-→ private topic support-request:<opaque-id>
+→ trusted publisher
+→ private topic
 → authorized subscriber
 ```
 
-Validation-only implementation details:
+Result:
 
-- `support_messages` removed from `supabase_realtime` publication;
-- `authenticated` `SELECT` on `support_messages` revoked;
-- `support_requests.realtime_topic` added as an opaque channel key;
-- trusted trigger published a minimized payload through `realtime.send(...)`;
-- Realtime channel authorization used `realtime.messages` RLS with:
-  - `SELECT` policy scoped by topic authorization;
-  - constrained `INSERT` probe policy for the join handshake only.
+- unauthorized topics were denied;
+- authorized delivery path RT-04 failed;
+- no accepted replacement transport existed after that wave.
 
-#### Option B — Denormalized direct predicate
+#### Option B evaluated in this wave — Denormalized direct ownership
 
-Evaluated as the fallback path:
-
-- duplicate direct ownership columns onto the Realtime-visible row;
-- keep `postgres_changes`;
-- replace join-based policy with a direct predicate.
-
-This option was **not implemented in this remediation wave** because the private-Broadcast path was tested first as the smaller security-preserving change.
-
----
-
-## Runtime evidence for the private-Broadcast attempt
-
-Validation environment:
-
-- local Supabase CLI project `aistudio-hoa-connect-resident-app`
-- Supabase CLI `v2.107.0`
-- Postgres image `public.ecr.aws/supabase/postgres:17.6.1.136`
-- Realtime image `public.ecr.aws/supabase/realtime:v2.107.5`
-- Kong image `public.ecr.aws/supabase/kong:2.8.1`
-- loopback API `http://127.0.0.1:54331`
-- loopback DB `127.0.0.1:54332`
-
-Observed secure join-probe shape from the local Realtime stack:
+Validation-only design implemented locally:
 
 ```text
-INSERT INTO realtime.messages (topic, updated_at, inserted_at, extension) RETURNING *
+postgres_changes
++ narrow SELECT grant
++ immutable server-derived authorization fields
++ direct RLS predicate on support_messages
 ```
 
-Observed inserted values:
+Selected local ownership model:
 
 ```text
-topic=<requested private topic>
-extension=broadcast
-event=NULL
-private=false
-payload=NULL
+support_messages.tenant_id
+support_messages.property_id
+support_messages.resident_profile_id
+support_messages.resident_user_id
+support_messages.resident_access_revoked
+support_messages.support_request_id
 ```
 
-That proved the local stack requires `realtime.messages` insert authorization even for a read-only private-channel join.
+### Trust boundary
 
-The remediation therefore constrained the join probe to:
+Clients submit only:
 
-- authorized topic only;
-- `extension = 'broadcast'`;
-- `event IS NULL`;
-- `payload IS NULL`;
-- `private = false`;
-- `binary_payload IS NULL`.
+- `support_request_id`
+- message content
 
-Even with that constrained probe policy, the July 19, 2026 runtime rerun still produced:
+Trusted database logic derives:
 
-- `RT-04`: authorized resident subscription rejected with `CHANNEL_ERROR`;
-- `RT-06`: unrelated user rejected;
-- `RT-07`: guessed topic rejected;
-- `RT-08`: direct `support_messages` table read denied as intended.
+- `tenant_id`
+- `property_id`
+- `resident_profile_id`
+- `resident_user_id`
+- revocation state
 
-This means the private-Broadcast transport did not reach the minimum required outcome:
+### Grant model
+
+```sql
+GRANT SELECT ON public.support_messages TO authenticated;
+GRANT EXECUTE ON FUNCTION public.create_support_message(...) TO authenticated;
+```
+
+No direct `INSERT`, `UPDATE`, or `DELETE` grant to `authenticated`.
+
+### Authorization model
+
+Resident read predicate:
+
+```sql
+resident_user_id = auth.uid()
+AND resident_access_revoked = false
+```
+
+Additional explicit policies exist for:
+
+- authorized operator access in-tenant;
+- platform administrator access.
+
+### Immutability model
+
+Protected after insert:
+
+- `tenant_id`
+- `property_id`
+- `resident_profile_id`
+- `resident_user_id`
+- `support_request_id`
+
+Mutation attempts are denied by trigger.
+
+### Payload model
+
+Expected runtime payload was limited to the approved message row shape already exposed by `postgres_changes`.
+
+Forbidden fields remained excluded from the validation schema:
+
+- internal operator notes;
+- audit metadata;
+- private contact data;
+- service metadata.
+
+### Direct-read behavior
+
+Direct authenticated reads were intentionally restricted by RLS to authorized rows only.
+
+### Runtime evidence
+
+Machine-readable evidence:
+
+- [validation/evidence/adr09_support_messages_option_b_probe.json](/home/ubuntu/projects/connect/03-products/hoa-connect/aistudio-hoa-connect-resident-app/validation/evidence/adr09_support_messages_option_b_probe.json)
+
+Observed July 19, 2026 behavior for the authorized resident subscription:
+
+```json
+{
+  "schema": "public",
+  "table": "support_messages",
+  "eventType": "INSERT",
+  "new": {},
+  "old": {},
+  "errors": ["Error 401: Unauthorized"]
+}
+```
+
+That means Option B still failed the decisive condition:
 
 ```text
-authorized participants receive support-message events
+authorized participant receives one approved event payload
+and
+foreign users receive no event envelope
 ```
 
-and therefore could not be accepted.
+### Validation outcome
+
+SQL controls passed:
+
+- DB-01 through DB-10 passed in the local validation model;
+- spoofed ownership values were overwritten or denied;
+- ownership mutation was denied;
+- direct reads remained tenant-safe.
+
+Runtime controls failed:
+
+- RT-04 authorized delivery failed;
+- RT-10 logical single delivery failed because the delivered object was an unauthorized envelope;
+- RT-11 ordering could not be validated from approved rows;
+- RT-12 revocation still delivered an unauthorized envelope;
+- RT-13 concurrent tenant subscriptions still emitted unauthorized envelopes to Tenant A;
+- RT-14 reconnect still delivered an unauthorized envelope.
+
+### Performance note
+
+The validation queries are protected logically, but the July 19, 2026 local `EXPLAIN` output still showed `Seq Scan` plans for:
+
+- resident read by `tenant_id + resident_profile_id`;
+- request read by `support_request_id`;
+- cross-tenant denial path.
+
+This is not the D2 blocker, but it remains an unresolved readiness concern.
 
 ---
 
@@ -180,34 +253,16 @@ and therefore could not be accepted.
 
 ### Accepted
 
-- `notifications` remain on `postgres_changes` with narrow `SELECT` grant and RLS.
+- `notifications` stays on `postgres_changes` with narrow `SELECT` and RLS.
 
 ### Rejected
 
-- `support_messages` private Broadcast is **rejected for this wave**.
+- private Broadcast is rejected for `support_messages`;
+- Option B is not accepted as a validated transport because runtime evidence still delivers unauthorized envelopes.
 
-Reason:
+### Current state
 
-- the authorized subscriber could not be validated end to end in the local runtime;
-- no accepted runtime result exists for RT-04, RT-11 or RT-14;
-- a broader Realtime write policy would have been the next escalation point, and that would need a separate security review because it changes client-channel write semantics.
-
-### Not yet accepted
-
-- no replacement transport for `support_messages` is accepted as of July 19, 2026.
-
----
-
-## Direct-read behavior
-
-### Notifications
-
-- direct authenticated read remains allowed only through the narrow `SELECT` + RLS exception.
-
-### Support messages
-
-- direct authenticated read is denied in the private-Broadcast attempt.
-- this boundary is preferred and was preserved in the remediation validation.
+No accepted `support_messages` Realtime transport exists as of July 19, 2026.
 
 ---
 
@@ -225,42 +280,34 @@ Validated:
 
 Not validated:
 
-- unauthorized users were denied private-topic joins;
-- authorized users were also denied;
-- the transport therefore did not satisfy the functional security contract.
+- foreign filtered subscriptions were silent;
+- unrelated authenticated users were silent;
+- but the authorized resident path still received unauthorized envelopes instead of row payloads;
+- revocation and reconnect cases remained red for the same reason.
 
 ---
 
 ## Operational consequences
 
-For the attempted private-Broadcast design:
-
-- trusted publish trigger is straightforward;
-- payload minimization is straightforward;
-- direct-read denial is straightforward;
-- channel-join authorization remains the blocking behavior.
-
-Revocation, duplicate suppression, ordering and reconnect semantics cannot be accepted until RT-04 succeeds first.
+- Notifications can proceed under the retained model.
+- `support_messages` cannot proceed to Sprint 1.
+- The current Option B schema proves the trust boundary and immutability model locally, but not the Realtime transport semantics.
+- Further remediation must focus on why local Realtime still evaluates the authorized `support_messages` row as unauthorized at delivery time.
 
 ---
 
 ## Rollback / revision conditions
 
-ADR-09 remains reopened for `support_messages` until one of the following is validated:
+ADR-09 remains reopened for `support_messages` until one design proves all of the following at runtime:
 
-1. a corrected private-Broadcast authorization model that passes RT-04 through RT-14, or
-2. a denormalized direct-predicate model that proves `no event delivered` for foreign conversations and still meets payload and direct-read requirements.
+1. authorized support event delivered as a row payload;
+2. foreign and cross-tenant inserts produce no event envelope;
+3. revocation stops future delivery;
+4. reconnect behavior remains silent for foreign events;
+5. direct-read and grant boundaries stay narrow.
 
-Current smallest next remediation:
-
-```text
-Implement and validate Option B — denormalized direct ownership predicate for support_messages.
-```
-
----
-
-## Current verdict
+Smallest next remediation:
 
 ```text
-D2 FAIL — SPRINT 1 BLOCKED
+Trace and correct the remaining Realtime authorization mismatch for support_messages under Option B before any further transport redesign.
 ```

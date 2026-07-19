@@ -15,10 +15,10 @@ The July 19, 2026 Realtime remediation rerun did not change the program decision
 D2 FAIL — SPRINT 1 BLOCKED
 ```
 
-See [14-realtime-remediation-report.md](14-realtime-remediation-report.md) for the support-messages-specific remediation evidence.
+See [14-realtime-remediation-report.md](14-realtime-remediation-report.md) for the remediation recap and [15-realtime-option-b-validation-report.md](15-realtime-option-b-validation-report.md) for the final Option B validation evidence.
 
 This report remains the close-out artifact for the **architecture remediation wave only**.
-The later D2 validation wave executed the runtime conditions and produced:
+The later D2 validation wave and Wave B Option B rerun executed the runtime conditions and produced:
 
 ```text
 D2 FAIL — SPRINT 1 BLOCKED
@@ -171,6 +171,8 @@ New risks added:
 **Historical decision at the end of the remediation wave:** `PASS WITH CONDITIONS`
 
 **Superseding runtime validation result on July 19, 2026:** see [13-d2-validation-report.md](13-d2-validation-report.md).
+
+**Support-messages Wave B evidence on July 19, 2026:** see [15-realtime-option-b-validation-report.md](15-realtime-option-b-validation-report.md).
 
 ---
 
