@@ -3,18 +3,23 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "packageManager": "npm@10.9.8",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "type-check": "tsc --noEmit --project tsconfig.app.json",
+    "typecheck": "npm run type-check",
     "supabase:start": "supabase start",
     "supabase:stop": "supabase stop",
     "supabase:reset": "supabase db reset",
     "supabase:test:sprint1": "bash -lc 'docker exec -i supabase_db_aistudio-hoa-connect-resident-app psql -U postgres -d postgres < supabase/tests/sprint01_foundation.sql'",
     "supabase:test:d2": "bash validation/run_d2_regression.sh",
     "supabase:test:all": "npm run supabase:test:sprint1 && npm run supabase:test:d2",
+    "supabase:test:edge-func-auth": "bash -lc 'docker exec -i supabase_db_aistudio-hoa-connect-resident-app psql -U postgres -d postgres < supabase/tests/sprint01_edge_function_fixtures.sql' && node supabase/tests/sprint01_edge_function_auth.test.mjs",
+    "supabase:perf:seed": "bash -lc 'docker exec -i supabase_db_aistudio-hoa-connect-resident-app psql -U postgres -d postgres < supabase/tests/sprint01_performance_seed.sql'",
+    "supabase:perf:explain": "bash -lc 'docker exec -i supabase_db_aistudio-hoa-connect-resident-app psql -U postgres -d postgres < supabase/tests/sprint01_performance_explain.sql'",
     "supabase:types": "supabase gen types typescript --local > src/lib/supabase/database.types.ts"
   },
   "dependencies": {

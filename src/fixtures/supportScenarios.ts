@@ -365,12 +365,12 @@ export function getSupportOverview(residenceId?: string): SupportOverview {
         ],
         messages: [
           ...reqProp001[0].messages,
-          { id: 'msg-4', dateTime: '2026-07-17T10:05:00', senderType: 'association', senderName: 'Associação', content: 'Realizamos a vistoria hoje e identificamos um pequeno vazamento na conexão da tubulação. O reparo já foi feito. A parede deve secar nos próximos dias. Se notar qualquer outro problema, nos avise.', unread: false, attachment: undefined, requiresReply: false },
+          { id: 'msg-4', dateTime: '2026-07-17T10:05:00', senderType: 'association' as const, senderName: 'Associação', content: 'Realizamos a vistoria hoje e identificamos um pequeno vazamento na conexão da tubulação. O reparo já foi feito. A parede deve secar nos próximos dias. Se notar qualquer outro problema, nos avise.', unread: false, attachment: undefined, requiresReply: false },
         ],
         eligibleActions: [
-          { type: 'reply', label: 'Responder', icon: 'ri-chat-1-line' },
-          { type: 'close_request', label: 'Encerrar solicitação', icon: 'ri-check-double-line' },
-          { type: 'rate', label: 'Avaliar atendimento', icon: 'ri-star-line' },
+          { type: 'reply' as const, label: 'Responder', icon: 'ri-chat-1-line' },
+          { type: 'close_request' as const, label: 'Encerrar solicitação', icon: 'ri-check-double-line' },
+          { type: 'rate' as const, label: 'Avaliar atendimento', icon: 'ri-star-line' },
         ],
       };
       return buildOverview({ scenario: 'resolved', hasActiveRequests: true, openCount: 1, recentlyUpdatedCount: 1, statusMessage: 'Sua solicitação foi resolvida.', statusType: 'all_ok', requests: [r], residenceId: rid });
@@ -384,7 +384,7 @@ export function getSupportOverview(residenceId?: string): SupportOverview {
         statusExplanation: 'Esta solicitação foi encerrada e arquivada.',
         expectedNextStep: 'Nenhuma ação pendente.',
         eligibleActions: [
-          { type: 'reopen_request', label: 'Reabrir solicitação', icon: 'ri-refresh-line' },
+          { type: 'reopen_request' as const, label: 'Reabrir solicitação', icon: 'ri-refresh-line' },
         ],
         rating: { score: 5, comment: 'Muito bom atendimento, rápido e eficiente.', submittedDate: '2026-07-17T15:00:00' },
       };
@@ -399,7 +399,7 @@ export function getSupportOverview(residenceId?: string): SupportOverview {
         statusExplanation: 'Esta solicitação foi encerrada. Se o problema persistir, você pode reabri-la.',
         expectedNextStep: 'Caso o problema não tenha sido totalmente resolvido, reabra a solicitação.',
         eligibleActions: [
-          { type: 'reopen_request', label: 'Reabrir solicitação', icon: 'ri-refresh-line' },
+          { type: 'reopen_request' as const, label: 'Reabrir solicitação', icon: 'ri-refresh-line' },
         ],
       };
       return buildOverview({ scenario: 'eligible_reopen', hasActiveRequests: false, openCount: 0, statusMessage: 'Nenhuma solicitação em aberto.', statusType: 'no_requests', requests: [r], residenceId: rid });
@@ -423,7 +423,7 @@ export function getSupportOverview(residenceId?: string): SupportOverview {
         hasUnreadMessages: true,
         messages: [
           ...reqProp001[0].messages,
-          { id: 'msg-5', dateTime: '2026-07-17T11:00:00', senderType: 'association', senderName: 'Associação', content: 'Nossa equipe precisa de mais informações sobre o local exato da umidade. Você poderia nos informar se ela está na parede do fundo ou na lateral? Isso ajuda a identificar a origem do possível vazamento.', unread: true, attachment: undefined, requiresReply: true },
+          { id: 'msg-5', dateTime: '2026-07-17T11:00:00', senderType: 'association' as const, senderName: 'Associação', content: 'Nossa equipe precisa de mais informações sobre o local exato da umidade. Você poderia nos informar se ela está na parede do fundo ou na lateral? Isso ajuda a identificar a origem do possível vazamento.', unread: true, attachment: undefined, requiresReply: true },
         ],
       };
       return buildOverview({ scenario: 'unread_message', hasActiveRequests: true, openCount: 1, recentlyUpdatedCount: 1, statusMessage: 'Nova mensagem da associação.', statusType: 'action_needed', requests: [r], residenceId: rid });
@@ -433,7 +433,7 @@ export function getSupportOverview(residenceId?: string): SupportOverview {
       const r = {
         ...reqProp001[0],
         attachments: [
-          { id: 'att-3', name: 'foto_parede.jpg', type: 'photo', size: '2.4 MB', isDemo: true },
+          { id: 'att-3', name: 'foto_parede.jpg', type: 'photo' as const, size: '2.4 MB', isDemo: true },
         ],
       };
       return buildOverview({ scenario: 'attachment_unavailable', hasActiveRequests: true, openCount: 1, recentlyUpdatedCount: 1, statusMessage: 'Solicitação em andamento.', statusType: 'all_ok', requests: [r], residenceId: rid });

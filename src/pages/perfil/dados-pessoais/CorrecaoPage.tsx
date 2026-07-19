@@ -132,7 +132,7 @@ export default function CorrecaoPage() {
               </label>
               <Input
                 value={requestedValue}
-                onChange={setRequestedValue}
+                onChange={(e) => setRequestedValue(e.target.value)}
                 placeholder="Informe o valor correto"
                 maxLength={80}
               />
@@ -168,7 +168,7 @@ export default function CorrecaoPage() {
               </label>
               <Input
                 value={attachmentName}
-                onChange={setAttachmentName}
+                onChange={(e) => setAttachmentName(e.target.value)}
                 placeholder="Nome do arquivo (ex: documento.pdf)"
                 maxLength={60}
               />

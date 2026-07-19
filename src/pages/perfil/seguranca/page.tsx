@@ -254,15 +254,15 @@ export default function SegurancaPage() {
         <div className="space-y-3">
           <div>
             <label className="text-xs font-medium text-foreground-700 block mb-1">Senha atual</label>
-            <Input value={currentPw} onChange={setCurrentPw} type={showPw ? 'text' : 'password'} placeholder="••••••" maxLength={40} />
+            <Input value={currentPw} onChange={(e) => setCurrentPw(e.target.value)} type={showPw ? 'text' : 'password'} placeholder="••••••" maxLength={40} />
           </div>
           <div>
             <label className="text-xs font-medium text-foreground-700 block mb-1">Nova senha</label>
-            <Input value={newPw} onChange={setNewPw} type={showPw ? 'text' : 'password'} placeholder="Mínimo 6 caracteres" maxLength={40} />
+            <Input value={newPw} onChange={(e) => setNewPw(e.target.value)} type={showPw ? 'text' : 'password'} placeholder="Mínimo 6 caracteres" maxLength={40} />
           </div>
           <div>
             <label className="text-xs font-medium text-foreground-700 block mb-1">Confirmar nova senha</label>
-            <Input value={confirmPw} onChange={setConfirmPw} type={showPw ? 'text' : 'password'} placeholder="••••••" maxLength={40} />
+            <Input value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} type={showPw ? 'text' : 'password'} placeholder="••••••" maxLength={40} />
           </div>
           <button
             onClick={() => setShowPw(!showPw)}

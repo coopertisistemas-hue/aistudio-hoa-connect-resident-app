@@ -25,7 +25,7 @@ const typeConfig: Record<ToastType, { bg: string; icon: string }> = {
   info: { bg: 'bg-primary-600', icon: 'ri-information-line' },
 };
 
-export default function ToastContainer() {
+export default function ToastContainer(_props?: { message?: string; type?: string }) {
   const [toasts, setToasts] = useState<ToastData[]>([]);
 
   const addToast = useCallback((toast: Omit<ToastData, 'id'>) => {

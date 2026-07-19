@@ -99,7 +99,7 @@ export default function DadosPessoaisEditPage() {
             <p className="text-xs text-foreground-400 mb-2">Como você gostaria de ser chamado no aplicativo</p>
             <Input
               value={preferredName}
-              onChange={(v) => setPreferredName(v)}
+              onChange={(e) => setPreferredName(e.target.value)}
               placeholder="Ex: Carlinhos"
               maxLength={40}
             />
@@ -112,7 +112,7 @@ export default function DadosPessoaisEditPage() {
             <p className="text-xs text-foreground-400 mb-2">Nome exibido em mensagens e interações</p>
             <Input
               value={displayName}
-              onChange={(v) => setDisplayName(v)}
+              onChange={(e) => setDisplayName(e.target.value)}
               placeholder={data.profile.fullName}
               maxLength={60}
             />
@@ -125,7 +125,7 @@ export default function DadosPessoaisEditPage() {
             <p className="text-xs text-foreground-400 mb-2">Pronome ou forma de tratamento</p>
             <Input
               value={pronounPreference}
-              onChange={(v) => setPronounPreference(v)}
+              onChange={(e) => setPronounPreference(e.target.value)}
               placeholder="Ex: Sr., Sra., ele/dele, ela/dela"
               maxLength={30}
             />

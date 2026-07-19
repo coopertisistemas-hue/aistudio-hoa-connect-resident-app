@@ -178,7 +178,7 @@ export default function ContatosPage() {
         <div>
           <Input
             value={editValue}
-            onChange={setEditValue}
+            onChange={(e) => setEditValue(e.target.value)}
             placeholder="Digite o novo valor"
             maxLength={60}
           />
@@ -210,7 +210,7 @@ export default function ContatosPage() {
           </p>
           <Input
             value={verifyCode}
-            onChange={setVerifyCode}
+            onChange={(e) => setVerifyCode(e.target.value)}
             placeholder="Código de 4 dígitos"
             maxLength={6}
           />

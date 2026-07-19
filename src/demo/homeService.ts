@@ -7,7 +7,7 @@ import { openTicket, noTicket } from '@/fixtures/support';
 import { recentActivities, emptyActivity } from '@/fixtures/activity';
 
 function buildPrimaryStatus(): PrimaryStatus {
-  switch (activeScenario) {
+  switch (activeScenario as string) {
     case 'overdue':
       return {
         type: 'invoice_overdue',
