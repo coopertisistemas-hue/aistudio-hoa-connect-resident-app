@@ -6,6 +6,8 @@
 
 ## 1. Risk register
 
+**July 19, 2026 remediation update:** `notifications` remains validated, ADR-10 remains validated, ADR-11 remains validated, and `support_messages` private Broadcast still failed authorized runtime delivery. Sprint 1 remains blocked by ADR-09 only. See [14-realtime-remediation-report.md](14-realtime-remediation-report.md).
+
 Scoring: Probability × Impact, both 1–5. **Exposure ≥ 15 requires a named owner and a mitigation
 that lands before the dependent sprint opens.**
 

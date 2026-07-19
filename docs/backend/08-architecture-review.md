@@ -44,6 +44,8 @@
 
 ## 2. Executive conclusion
 
+**July 19, 2026 remediation update:** the original architecture review findings remain closed except ADR-09 for `support_messages`. ADR-10 and ADR-11 stayed validated. The attempted private-Broadcast remediation for `support_messages` did not validate the authorized subscriber path and therefore did not reopen the architecture review beyond that single blocker. See [14-realtime-remediation-report.md](14-realtime-remediation-report.md).
+
 The independent review **validates** the central architectural choices of the blueprint:
 
 1. Extension of the existing production Supabase backend rather than greenfield replacement.

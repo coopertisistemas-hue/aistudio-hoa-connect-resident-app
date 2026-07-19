@@ -22,7 +22,13 @@ DROP FUNCTION IF EXISTS public.is_platform_admin() CASCADE;
 DROP FUNCTION IF EXISTS public.is_tenant_member(uuid) CASCADE;
 DROP FUNCTION IF EXISTS public.is_authorized_operator(uuid) CASCADE;
 DROP FUNCTION IF EXISTS public.is_support_request_author(uuid) CASCADE;
+DROP FUNCTION IF EXISTS public.generate_support_request_topic() CASCADE;
+DROP FUNCTION IF EXISTS public.can_access_support_request_topic(text) CASCADE;
+DROP FUNCTION IF EXISTS public.rotate_support_request_topic(uuid) CASCADE;
+DROP FUNCTION IF EXISTS public.broadcast_support_message() CASCADE;
 DROP FUNCTION IF EXISTS public.apply_profile_correction(uuid, text, text) CASCADE;
+
+DROP POLICY IF EXISTS support_messages_broadcast_select_policy ON realtime.messages;
 
 DO $$
 BEGIN
@@ -139,6 +145,7 @@ CREATE TABLE public.support_requests (
   tenant_id uuid NOT NULL REFERENCES public.tenants(id),
   property_id uuid NOT NULL REFERENCES public.properties(id),
   profile_id uuid NOT NULL REFERENCES public.profiles(id),
+  realtime_topic text NOT NULL UNIQUE,
   protocol text NOT NULL,
   category text NOT NULL,
   status text NOT NULL DEFAULT 'submitted',
@@ -149,6 +156,7 @@ CREATE TABLE public.support_requests (
 CREATE TABLE public.support_messages (
   id uuid PRIMARY KEY,
   support_request_id uuid NOT NULL REFERENCES public.support_requests(id),
+  delivery_sequence bigint GENERATED ALWAYS AS IDENTITY,
   sender_type text NOT NULL CHECK (sender_type IN ('resident', 'association', 'system')),
   sender_profile_id uuid REFERENCES public.profiles(id),
   content text NOT NULL,
@@ -241,6 +249,105 @@ AS $$
   );
 $$;
 
+CREATE OR REPLACE FUNCTION public.generate_support_request_topic()
+RETURNS text
+LANGUAGE sql
+VOLATILE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  SELECT 'support-request:' || md5(random()::text || clock_timestamp()::text || txid_current()::text);
+$$;
+
+CREATE OR REPLACE FUNCTION public.can_access_support_request_topic(target_topic text)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.support_requests AS sr
+    WHERE sr.realtime_topic = target_topic
+      AND (
+        (
+          sr.profile_id = public.current_profile_id()
+          AND EXISTS (
+            SELECT 1
+            FROM public.residence_members AS rm
+            WHERE rm.tenant_id = sr.tenant_id
+              AND rm.property_id = sr.property_id
+              AND rm.profile_id = sr.profile_id
+              AND rm.status = 'active'
+          )
+        )
+        OR public.is_authorized_operator(sr.tenant_id)
+        OR public.is_platform_admin()
+      )
+  );
+$$;
+
+CREATE OR REPLACE FUNCTION public.rotate_support_request_topic(target_request_id uuid)
+RETURNS text
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  next_topic text;
+BEGIN
+  next_topic := public.generate_support_request_topic();
+
+  UPDATE public.support_requests
+  SET realtime_topic = next_topic
+  WHERE id = target_request_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'support request not found';
+  END IF;
+
+  RETURN next_topic;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.broadcast_support_message()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  target_topic text;
+BEGIN
+  SELECT sr.realtime_topic
+  INTO target_topic
+  FROM public.support_requests AS sr
+  WHERE sr.id = NEW.support_request_id;
+
+  IF target_topic IS NULL THEN
+    RAISE EXCEPTION 'support request realtime topic missing for %', NEW.support_request_id;
+  END IF;
+
+  PERFORM realtime.send(
+    jsonb_build_object(
+      'message_id', NEW.id,
+      'conversation_topic', target_topic,
+      'sender_category', NEW.sender_type,
+      'body', NEW.content,
+      'created_at', NEW.created_at,
+      'has_attachments', false,
+      'sequence', NEW.delivery_sequence
+    ),
+    'support_message.created',
+    target_topic,
+    true
+  );
+
+  RETURN NULL;
+END;
+$$;
+
 CREATE OR REPLACE FUNCTION public.apply_profile_correction(
   target_profile_id uuid,
   replacement_document text,
@@ -305,7 +412,8 @@ CREATE INDEX idx_residence_members_profile_active ON public.residence_members(pr
 CREATE INDEX idx_residence_members_property_active ON public.residence_members(property_id) WHERE status = 'active';
 CREATE INDEX idx_notifications_profile_created ON public.notifications(profile_id, created_at DESC);
 CREATE INDEX idx_support_requests_profile ON public.support_requests(profile_id);
-CREATE INDEX idx_support_messages_request_created ON public.support_messages(support_request_id, created_at DESC);
+CREATE INDEX idx_support_requests_realtime_topic ON public.support_requests(realtime_topic);
+CREATE INDEX idx_support_messages_request_sequence ON public.support_messages(support_request_id, delivery_sequence);
 
 ALTER TABLE public.tenants ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.properties ENABLE ROW LEVEL SECURITY;
@@ -486,15 +594,31 @@ ON public.support_requests
 FOR SELECT
 USING (profile_id = public.current_profile_id());
 
-CREATE POLICY support_messages_select_self_policy
-ON public.support_messages
-FOR SELECT
-USING (public.is_support_request_author(support_request_id));
-
 CREATE POLICY profile_correction_audit_select_platform_admin_policy
 ON public.profile_correction_audit
 FOR SELECT
 USING (public.is_platform_admin());
+
+CREATE POLICY support_messages_broadcast_select_policy
+ON realtime.messages
+FOR SELECT
+TO authenticated
+USING (
+  public.can_access_support_request_topic(realtime.topic())
+);
+
+CREATE POLICY support_messages_broadcast_probe_insert_policy
+ON realtime.messages
+FOR INSERT
+TO authenticated
+WITH CHECK (
+  public.can_access_support_request_topic(topic)
+  AND extension = 'broadcast'
+  AND event IS NULL
+  AND payload IS NULL
+  AND private = false
+  AND binary_payload IS NULL
+);
 
 DO $$
 BEGIN
@@ -519,7 +643,12 @@ BEGIN
   END IF;
 END $$;
 
-ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications, public.support_messages;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications;
+
+CREATE TRIGGER broadcast_support_message_after_insert
+AFTER INSERT ON public.support_messages
+FOR EACH ROW
+EXECUTE FUNCTION public.broadcast_support_message();
 
 REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon, authenticated;
 REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM anon, authenticated;
@@ -527,7 +656,6 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES FROM anon, authen
 
 GRANT USAGE ON SCHEMA public TO anon, authenticated;
 GRANT SELECT ON public.notifications TO authenticated;
-GRANT SELECT ON public.support_messages TO authenticated;
 
 GRANT USAGE ON SCHEMA public TO profile_read_test, profile_self_update_test, operator_contact_test, platform_admin_test;
 
@@ -582,9 +710,9 @@ INSERT INTO public.profile_contacts (id, profile_id, contact_type, normalized_va
   ('60000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000001', 'primary_email', 'resident.a@example.com', 'resident.a@example.com', 'verified', '{"invoiceDelivery":"email"}'),
   ('60000000-0000-0000-0000-000000000002', '20000000-0000-0000-0000-000000000002', 'primary_email', 'resident.b@example.com', 'resident.b@example.com', 'pending', '{"invoiceDelivery":"whatsapp"}');
 
-INSERT INTO public.support_requests (id, tenant_id, property_id, profile_id, protocol, category, subject) VALUES
-  ('70000000-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '20000000-0000-0000-0000-000000000001', 'SUP-A-001', 'other', 'Support request A'),
-  ('70000000-0000-0000-0000-000000000002', '22222222-2222-2222-2222-222222222222', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '20000000-0000-0000-0000-000000000002', 'SUP-B-001', 'other', 'Support request B');
+INSERT INTO public.support_requests (id, tenant_id, property_id, profile_id, realtime_topic, protocol, category, subject) VALUES
+  ('70000000-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '20000000-0000-0000-0000-000000000001', 'support-request:3cdb6d1e7d8a4bb08f9e18c2d53f6a41', 'SUP-A-001', 'other', 'Support request A'),
+  ('70000000-0000-0000-0000-000000000002', '22222222-2222-2222-2222-222222222222', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '20000000-0000-0000-0000-000000000002', 'support-request:b4f8c61e2d3047f68b7c95e1a2fd4e73', 'SUP-B-001', 'other', 'Support request B');
 
-INSERT INTO public.support_messages (id, support_request_id, sender_type, sender_profile_id, content) VALUES
-  ('80000000-0000-0000-0000-000000000001', '70000000-0000-0000-0000-000000000001', 'resident', '20000000-0000-0000-0000-000000000001', 'Initial message A');
+INSERT INTO public.support_messages (id, support_request_id, sender_type, sender_profile_id, content, created_at) VALUES
+  ('80000000-0000-0000-0000-000000000001', '70000000-0000-0000-0000-000000000001', 'resident', '20000000-0000-0000-0000-000000000001', 'Initial message A', '2026-07-19T09:00:00Z');

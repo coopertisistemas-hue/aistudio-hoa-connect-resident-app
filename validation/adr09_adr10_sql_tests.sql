@@ -64,7 +64,15 @@ WHERE schemaname = 'public'
 ORDER BY tablename, policyname;
 
 \echo ''
-\echo '--- RT-06 direct table-read boundary as authenticated resident ---'
+\echo '--- Realtime authorization policies ---'
+SELECT schemaname, tablename, policyname, cmd
+FROM pg_policies
+WHERE schemaname = 'realtime'
+  AND tablename = 'messages'
+ORDER BY policyname;
+
+\echo ''
+\echo '--- RT-08 direct table-read boundary as authenticated resident ---'
 DO $$
 DECLARE
   cnt integer;
@@ -76,15 +84,17 @@ BEGIN
   SELECT COUNT(*) INTO cnt FROM public.notifications;
   RAISE NOTICE 'notifications visible to Resident A: % (expected 0 before inserts)', cnt;
 
-  SELECT COUNT(*) INTO cnt FROM public.support_messages;
-  RAISE NOTICE 'support_messages visible to Resident A: % (expected 1 baseline)', cnt;
-  IF cnt <> 1 THEN
-    RAISE EXCEPTION 'RT-06 FAILED: Resident A should see exactly the baseline support message';
-  END IF;
+  BEGIN
+    PERFORM 1 FROM public.support_messages;
+    RAISE EXCEPTION 'RT-08 FAILED: support_messages SELECT should be denied';
+  EXCEPTION
+    WHEN insufficient_privilege THEN
+      RAISE NOTICE 'support_messages SELECT correctly denied';
+  END;
 
   BEGIN
     PERFORM 1 FROM public.tenants;
-    RAISE EXCEPTION 'RT-06 FAILED: tenants SELECT should be denied';
+    RAISE EXCEPTION 'RT-08 FAILED: tenants SELECT should be denied';
   EXCEPTION
     WHEN insufficient_privilege THEN
       RAISE NOTICE 'tenants SELECT correctly denied';
@@ -92,7 +102,7 @@ BEGIN
 
   BEGIN
     PERFORM 1 FROM public.profiles;
-    RAISE EXCEPTION 'RT-06 FAILED: profiles SELECT should be denied to authenticated';
+    RAISE EXCEPTION 'RT-08 FAILED: profiles SELECT should be denied to authenticated';
   EXCEPTION
     WHEN insufficient_privilege THEN
       RAISE NOTICE 'profiles SELECT correctly denied';
@@ -100,7 +110,7 @@ BEGIN
 
   BEGIN
     PERFORM 1 FROM public.support_requests;
-    RAISE EXCEPTION 'RT-06 FAILED: support_requests SELECT should be denied';
+    RAISE EXCEPTION 'RT-08 FAILED: support_requests SELECT should be denied';
   EXCEPTION
     WHEN insufficient_privilege THEN
       RAISE NOTICE 'support_requests SELECT correctly denied';
@@ -394,11 +404,9 @@ WHERE EXISTS (
 );
 
 EXPLAIN (COSTS OFF)
-SELECT sm.id
-FROM public.support_messages AS sm
-JOIN public.support_requests AS sr
-  ON sr.id = sm.support_request_id
-WHERE sr.profile_id = '20000000-0000-0000-0000-000000000001';
+SELECT sr.id
+FROM public.support_requests AS sr
+WHERE sr.realtime_topic = 'support-request:3cdb6d1e7d8a4bb08f9e18c2d53f6a41';
 
 \echo ''
 \echo '=== ADR-09 / ADR-10 SQL validation completed ==='

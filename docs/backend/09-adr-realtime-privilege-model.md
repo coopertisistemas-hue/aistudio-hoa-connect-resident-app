@@ -2,186 +2,265 @@
 
 ## Status
 
-**Accepted in architecture — runtime validation failed on July 19, 2026.**
+**Notifications path retained. Support-messages path unresolved after remediation validation on July 19, 2026.**
 
-Dependent on ADR-07 (PostgREST grant revocation). Blocks Sprint 6 (Communication) and Sprint 7 (Support).
+Dependent on ADR-07. ADR-10 and ADR-11 remain validated and unchanged.
 
 ---
 
 ## Context
 
-Realtime is the one client-facing path where RLS is load-bearing for normal traffic. Edge Functions use `service_role` and bypass RLS; PostgREST is closed under ADR-07. Only Supabase Realtime evaluates RLS policies when an `authenticated` client subscribes to `postgres_changes`.
+The Resident App needs Realtime for two different surfaces:
 
-The Resident App requires Realtime for:
+- `notifications`
+- `support_messages`
 
-- notifications (unread badge accuracy);
-- support messages and status changes (conversation freshness).
-
-These are backed by `notifications` and `support_messages` respectively.
+These surfaces no longer share one validated transport model.
 
 ---
 
-## Problem
+## Failed assumption
 
-ADR-07 proposes:
+The original July 19, 2026 D2 validation accepted one uniform model:
+
+```text
+postgres_changes + narrow SELECT grant + RLS
+```
+
+That remained valid for `notifications`, but failed for `support_messages`.
+
+Runtime evidence from the first D2 validation wave:
+
+```json
+{
+  "schema": "public",
+  "table": "support_messages",
+  "eventType": "INSERT",
+  "new": {},
+  "old": {},
+  "errors": ["Error 401: Unauthorized"]
+}
+```
+
+That envelope was delivered to a resident who was not authorized for the foreign conversation.
+
+`401 inside an event` is still a failed isolation outcome because the subscriber learned that a foreign write occurred.
+
+---
+
+## Notifications
+
+### Retained model
+
+```text
+postgres_changes + narrow SELECT grant + RLS
+```
+
+### Grant model
 
 ```sql
 REVOKE ALL ON ALL TABLES    IN SCHEMA public FROM anon, authenticated;
 REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM anon, authenticated;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES FROM anon, authenticated;
+
+GRANT SELECT ON public.notifications TO authenticated;
 ```
 
-PostgreSQL evaluates table privileges before RLS. If `authenticated` has no `SELECT` on `notifications` and `support_messages`, a Realtime `postgres_changes` subscription on those tables will connect but receive no events. The failure is silent: the client sees a live connection but never gets data, making it worse than an obvious error.
+### Authorization model
 
-We therefore need a deliberate, minimal, auditable exception to the grant revocation for Realtime-backed tables.
+- `authenticated` receives `SELECT` on `notifications` only.
+- RLS constrains visibility to `profile_id = current_profile_id()`.
+- No write grants are restored.
+
+### Validation state
+
+Retained as **validated** from the D2 validation wave and re-observed during the remediation rerun:
+
+- authorized notification delivered;
+- unrelated authenticated user received nothing;
+- broad grants remained revoked.
 
 ---
 
-## Considered options
+## Support Messages
 
-### Option A — Narrow table grants
+### Options evaluated
 
-Grant `SELECT` only on the exact tables that require `postgres_changes`, while maintaining RLS isolation.
+#### Option A — Private Broadcast
 
-- Candidate tables: `notifications`, `support_messages`.
-- All other grants remain revoked.
-- RLS policies restrict each subscription to the caller's own data.
+Attempted design:
 
-### Option B — Broadcast from database triggers
+```text
+support_messages INSERT
+→ trusted trigger
+→ realtime.send(...)
+→ private topic support-request:<opaque-id>
+→ authorized subscriber
+```
 
-Use database-triggered Realtime Broadcast rather than direct `postgres_changes`.
+Validation-only implementation details:
 
-- Triggers on `notifications` and `support_messages` emit Broadcast events to private topics such as `resident:{profile_id}`.
-- Channels use private topics; clients must pass an access token validated by the Edge Function.
-- Payloads are minimized; tenant isolation is enforced by the trigger logic.
-- Higher operational complexity: trigger maintenance, payload design, channel authorization, and topic lifecycle.
+- `support_messages` removed from `supabase_realtime` publication;
+- `authenticated` `SELECT` on `support_messages` revoked;
+- `support_requests.realtime_topic` added as an opaque channel key;
+- trusted trigger published a minimized payload through `realtime.send(...)`;
+- Realtime channel authorization used `realtime.messages` RLS with:
+  - `SELECT` policy scoped by topic authorization;
+  - constrained `INSERT` probe policy for the join handshake only.
+
+#### Option B — Denormalized direct predicate
+
+Evaluated as the fallback path:
+
+- duplicate direct ownership columns onto the Realtime-visible row;
+- keep `postgres_changes`;
+- replace join-based policy with a direct predicate.
+
+This option was **not implemented in this remediation wave** because the private-Broadcast path was tested first as the smaller security-preserving change.
+
+---
+
+## Runtime evidence for the private-Broadcast attempt
+
+Validation environment:
+
+- local Supabase CLI project `aistudio-hoa-connect-resident-app`
+- Supabase CLI `v2.107.0`
+- Postgres image `public.ecr.aws/supabase/postgres:17.6.1.136`
+- Realtime image `public.ecr.aws/supabase/realtime:v2.107.5`
+- Kong image `public.ecr.aws/supabase/kong:2.8.1`
+- loopback API `http://127.0.0.1:54331`
+- loopback DB `127.0.0.1:54332`
+
+Observed secure join-probe shape from the local Realtime stack:
+
+```text
+INSERT INTO realtime.messages (topic, updated_at, inserted_at, extension) RETURNING *
+```
+
+Observed inserted values:
+
+```text
+topic=<requested private topic>
+extension=broadcast
+event=NULL
+private=false
+payload=NULL
+```
+
+That proved the local stack requires `realtime.messages` insert authorization even for a read-only private-channel join.
+
+The remediation therefore constrained the join probe to:
+
+- authorized topic only;
+- `extension = 'broadcast'`;
+- `event IS NULL`;
+- `payload IS NULL`;
+- `private = false`;
+- `binary_payload IS NULL`.
+
+Even with that constrained probe policy, the July 19, 2026 runtime rerun still produced:
+
+- `RT-04`: authorized resident subscription rejected with `CHANNEL_ERROR`;
+- `RT-06`: unrelated user rejected;
+- `RT-07`: guessed topic rejected;
+- `RT-08`: direct `support_messages` table read denied as intended.
+
+This means the private-Broadcast transport did not reach the minimum required outcome:
+
+```text
+authorized participants receive support-message events
+```
+
+and therefore could not be accepted.
 
 ---
 
 ## Decision
 
-Select **Option A — Narrow table grants**.
+### Accepted
 
-The grant set for the `authenticated` role on `public` becomes:
+- `notifications` remain on `postgres_changes` with narrow `SELECT` grant and RLS.
 
-```sql
--- ADR-07 baseline: revoke everything.
-REVOKE ALL ON ALL TABLES    IN SCHEMA public FROM anon, authenticated;
-REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM anon, authenticated;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES FROM anon, authenticated;
+### Rejected
 
--- ADR-09 exception: SELECT only on Realtime-backed tables.
-GRANT SELECT ON public.notifications    TO authenticated;
-GRANT SELECT ON public.support_messages TO authenticated;
-```
+- `support_messages` private Broadcast is **rejected for this wave**.
 
-`anon` receives no grants at all.
+Reason:
 
-### RLS requirements for the excepted tables
+- the authorized subscriber could not be validated end to end in the local runtime;
+- no accepted runtime result exists for RT-04, RT-11 or RT-14;
+- a broader Realtime write policy would have been the next escalation point, and that would need a separate security review because it changes client-channel write semantics.
 
-`notifications`:
+### Not yet accepted
 
-```sql
-CREATE POLICY "notifications_resident_select" ON public.notifications
-  FOR SELECT USING (profile_id = auth.uid());
-```
-
-`support_messages` (no direct `profile_id`; joins through `support_requests`):
-
-```sql
-CREATE POLICY "support_messages_resident_select" ON public.support_messages
-  FOR SELECT USING (
-    EXISTS (
-      SELECT 1
-      FROM public.support_requests sr
-      WHERE sr.id = support_messages.support_request_id
-        AND sr.profile_id = auth.uid()
-    )
-  );
-```
-
-Association staff read their tenant's messages through Edge Functions (`service_role`); no `authenticated` staff policy is required on `support_messages` for Realtime.
-
-### Why this is acceptable
-
-- The `authenticated` role can see only what RLS permits. The `SELECT` grant alone does not allow direct SQL reads of another resident's data.
-- No `INSERT`/`UPDATE`/`DELETE` grants are restored. Residents still cannot write directly.
-- The exception is enumerated (two tables), documented, and audited. Any future Realtime-backed table must pass the same review.
-- It preserves the structural guarantee of ADR-07: PostgREST direct access remains impossible except for the two narrow `SELECT` paths.
+- no replacement transport for `support_messages` is accepted as of July 19, 2026.
 
 ---
 
-## Consequences
+## Direct-read behavior
 
-- **Cost:** two explicit `GRANT SELECT` statements and two RLS policies must be maintained.
-- **Benefit:** Realtime works as designed with native `postgres_changes`; no trigger layer or custom Broadcast authorization is required.
-- **Risk:** a future migration that adds a Realtime-backed table may forget the matching `GRANT SELECT`. Mitigation: checklist item in the migration template; RLS regression test that asserts a subscription receives events.
-- **Performance:** the `support_messages` policy requires a join per Realtime event. The access path is indexed (`support_requests(profile_id)` and `support_messages(support_request_id)`).
+### Notifications
 
----
+- direct authenticated read remains allowed only through the narrow `SELECT` + RLS exception.
 
-## Rejected alternatives
+### Support messages
 
-| Alternative | Reason rejected |
-|---|---|
-| Grant `SELECT` on all tables to simplify Realtime | Destroys ADR-07 entirely and reopens HIGH-01. |
-| Option B — Broadcast from triggers | Adds operational complexity without a proportional benefit for two tenant-scoped tables. Reserved as a future optimization if `postgres_changes` proves insufficient. |
-| Skip Realtime entirely | Would regress the certified UX: unread badge and support thread would require manual refresh. |
+- direct authenticated read is denied in the private-Broadcast attempt.
+- this boundary is preferred and was preserved in the remediation validation.
 
 ---
 
-## Validation requirement
+## Tenant-isolation guarantees
 
-Before Sprint 6 implementation, validate in a branch or disposable Supabase project:
+### Notifications
 
-1. `anon` cannot subscribe to any Realtime channel.
-2. `authenticated` user A receives notifications only where `profile_id = A`.
-3. `authenticated` user A receives support messages only for support requests authored by A.
-4. `authenticated` user B receives no notifications or messages belonging to A.
-5. Revoking `SELECT` on `notifications` and `support_messages` from `authenticated` causes both channels to fall silent (regression test).
-6. `authenticated` cannot `INSERT`/`UPDATE`/`DELETE` either table directly via PostgREST.
+Validated:
+
+- own-row delivery only;
+- no unrelated-user delivery;
+- no broad grant reopening.
+
+### Support messages
+
+Not validated:
+
+- unauthorized users were denied private-topic joins;
+- authorized users were also denied;
+- the transport therefore did not satisfy the functional security contract.
 
 ---
 
-## Rollback or revision conditions
+## Operational consequences
 
-- If validation shows that narrow grants leak data across profiles, immediately revise the RLS policies before expanding the exception.
-- If future requirements demand cross-profile or broadcast-style events (e.g., association-wide real-time notices), revisit Option B.
-- If Supabase changes Realtime privilege semantics, re-evaluate this ADR.
+For the attempted private-Broadcast design:
+
+- trusted publish trigger is straightforward;
+- payload minimization is straightforward;
+- direct-read denial is straightforward;
+- channel-join authorization remains the blocking behavior.
+
+Revocation, duplicate suppression, ordering and reconnect semantics cannot be accepted until RT-04 succeeds first.
 
 ---
 
-## Validation Outcome — July 19, 2026
+## Rollback / revision conditions
 
-Validation ran in the isolated local Supabase CLI project `aistudio-hoa-connect-resident-app`
-on branch `d2-validation-wave`, using:
+ADR-09 remains reopened for `support_messages` until one of the following is validated:
 
-- [validation/d2_setup.sql](/home/ubuntu/projects/connect/03-products/hoa-connect/aistudio-hoa-connect-resident-app/validation/d2_setup.sql)
-- [validation/adr09_adr10_sql_tests.sql](/home/ubuntu/projects/connect/03-products/hoa-connect/aistudio-hoa-connect-resident-app/validation/adr09_adr10_sql_tests.sql)
-- [validation/adr09_adr10_runtime_probe.mjs](/home/ubuntu/projects/connect/03-products/hoa-connect/aistudio-hoa-connect-resident-app/validation/adr09_adr10_runtime_probe.mjs)
+1. a corrected private-Broadcast authorization model that passes RT-04 through RT-14, or
+2. a denormalized direct-predicate model that proves `no event delivered` for foreign conversations and still meets payload and direct-read requirements.
 
-Observed runtime evidence:
-
-- `notifications` validated successfully.
-  - RT-01 delivered the authorized resident notification at `2026-07-19T09:53:37.862Z`.
-  - RT-03 delivered nothing to an unrelated authenticated user during the 2000 ms observation window.
-- `support_messages` failed the isolation requirement.
-  - RT-04 produced a Realtime event envelope for the authorized request, but the payload contained `errors: ["Error 401: Unauthorized"]` instead of a clean row payload.
-  - RT-05 produced another event envelope for a foreign request during the same resident subscription, again with `errors: ["Error 401: Unauthorized"]`.
-  - This violates the required outcome `no event delivered to Resident A`.
-
-Architectural implication:
-
-- **Option A is not validated for `support_messages`.**
-- The narrow grant plus join-based RLS policy is sufficient for direct SQL/PostgREST reads, but it did not produce tenant-safe runtime isolation in `postgres_changes`.
-
-Smallest required remediation:
-
-- Keep Option A for `notifications`.
-- Replace `support_messages` Realtime with a private broadcast model, or denormalize recipient ownership onto `support_messages` so Realtime authorization can be expressed with a direct row predicate and revalidated.
-
-Current ADR-09 verdict:
+Current smallest next remediation:
 
 ```text
-VALIDATION FAILED — support_messages realtime isolation unresolved
+Implement and validate Option B — denormalized direct ownership predicate for support_messages.
+```
+
+---
+
+## Current verdict
+
+```text
+D2 FAIL — SPRINT 1 BLOCKED
 ```
