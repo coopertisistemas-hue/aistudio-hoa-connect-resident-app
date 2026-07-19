@@ -186,6 +186,39 @@ async function observeNoNewEvents(label, subscription, baselineCount, insertedAt
   };
 }
 
+async function waitForRealtimeStreaming() {
+  // d2_setup.sql drops and re-adds the d2_ tables to the supabase_realtime
+  // publication, and the local Realtime ReplicationPoller only re-checks
+  // publication membership on a ~60s cycle, restarting replication on the
+  // next tick. Block until a probe row is actually delivered so the numbered
+  // RT checks never race that reload.
+  const warmupClient = createAuthedClient(users.residentA);
+  const warmup = await subscribeToInserts(
+    warmupClient,
+    'd2b-rt-warmup',
+    'd2_notifications',
+    `profile_id=eq.${profiles.residentA}`,
+  );
+
+  const deadline = Date.now() + 150000;
+  let delivered = false;
+  while (!delivered && Date.now() < deadline) {
+    psql(`
+      INSERT INTO public.d2_notifications (id, tenant_id, profile_id, category, title_key, body_key)
+      VALUES ('${runtimeId()}', '11111111-1111-1111-1111-111111111111', '${profiles.residentA}', 'invoice', 'warmup.title', 'warmup.body');
+    `);
+    delivered = await waitForEventCount(warmup.events, 1, 3000);
+  }
+
+  await warmup.channel.unsubscribe();
+  await warmupClient.removeChannel(warmup.channel);
+  await warmupClient.removeAllChannels();
+
+  if (!delivered) {
+    throw new Error('Realtime warmup failed: d2_notifications streaming did not start within 150s');
+  }
+}
+
 function approvedSupportRow(newRow) {
   const forbiddenKeys = ['internal_note', 'operator_note', 'audit_metadata', 'private_contact', 'service_metadata'];
   return !forbiddenKeys.some((key) => Object.prototype.hasOwnProperty.call(newRow, key));
@@ -216,6 +249,7 @@ async function run() {
   };
 
   resetValidationState();
+  await waitForRealtimeStreaming();
 
   const subscriptions = [];
   const clients = [];
@@ -231,14 +265,14 @@ async function run() {
     const residentNotif = await subscribeToInserts(
       residentNotifClient,
       'd2b-rt-notifications-resident-a',
-      'notifications',
+      'd2_notifications',
       `profile_id=eq.${profiles.residentA}`,
     );
     subscriptions.push({ client: residentNotifClient, channel: residentNotif.channel });
 
     const notifInsertId = runtimeId();
     psql(`
-      INSERT INTO public.notifications (id, tenant_id, profile_id, category, title_key, body_key)
+      INSERT INTO public.d2_notifications (id, tenant_id, profile_id, category, title_key, body_key)
       VALUES ('${notifInsertId}', '11111111-1111-1111-1111-111111111111', '${profiles.residentA}', 'invoice', 'rt01.title', 'rt01.body');
     `);
 
@@ -250,7 +284,7 @@ async function run() {
     const notifNegativeStart = residentNotif.events.length;
     const crossTenantNotificationId = runtimeId();
     psql(`
-      INSERT INTO public.notifications (id, tenant_id, profile_id, category, title_key, body_key)
+      INSERT INTO public.d2_notifications (id, tenant_id, profile_id, category, title_key, body_key)
       VALUES ('${crossTenantNotificationId}', '22222222-2222-2222-2222-222222222222', '${profiles.residentB}', 'invoice', 'rt02.title', 'rt02.body');
     `);
     const rt02Observation = await observeNoNewEvents('rt02', residentNotif, notifNegativeStart, new Date().toISOString());
@@ -262,14 +296,14 @@ async function run() {
     const unrelatedNotif = await subscribeToInserts(
       unrelatedNotifClient,
       'd2b-rt-notifications-unrelated',
-      'notifications',
+      'd2_notifications',
       `profile_id=eq.${profiles.residentA}`,
     );
     subscriptions.push({ client: unrelatedNotifClient, channel: unrelatedNotif.channel });
 
     const unrelatedInsertId = runtimeId();
     psql(`
-      INSERT INTO public.notifications (id, tenant_id, profile_id, category, title_key, body_key)
+      INSERT INTO public.d2_notifications (id, tenant_id, profile_id, category, title_key, body_key)
       VALUES ('${unrelatedInsertId}', '11111111-1111-1111-1111-111111111111', '${profiles.residentA}', 'invoice', 'rt03.title', 'rt03.body');
     `);
     const rt03Observation = await observeNoNewEvents('rt03', unrelatedNotif, 0, new Date().toISOString());
@@ -281,13 +315,13 @@ async function run() {
     const residentSupport = await subscribeToInserts(
       residentSupportClient,
       'd2b-rt-support-resident-a',
-      'support_messages',
+      'd2_support_messages',
     );
     subscriptions.push({ client: residentSupportClient, channel: residentSupport.channel });
 
     const supportInsertId = runtimeId();
     psql(`
-      INSERT INTO public.support_messages (id, support_request_id, sender_type, sender_profile_id, content, created_at)
+      INSERT INTO public.d2_support_messages (id, support_request_id, sender_type, sender_profile_id, content, created_at)
       VALUES ('${supportInsertId}', '${requests.residentA}', 'association', null, 'Runtime validation message A', '2026-07-19T10:53:37.862Z');
     `);
     const rt04Delivered = await waitForEventCount(residentSupport.events, 1, DELIVERY_WAIT_MS);
@@ -316,14 +350,14 @@ async function run() {
     const foreignSubscription = await subscribeToInserts(
       foreignSupportClient,
       'd2b-rt-support-foreign-request',
-      'support_messages',
+      'd2_support_messages',
       `support_request_id=eq.${requests.residentB}`,
     );
     subscriptions.push({ client: foreignSupportClient, channel: foreignSubscription.channel });
 
     const foreignInsertId = runtimeId();
     psql(`
-      INSERT INTO public.support_messages (id, support_request_id, sender_type, sender_profile_id, content, created_at)
+      INSERT INTO public.d2_support_messages (id, support_request_id, sender_type, sender_profile_id, content, created_at)
       VALUES ('${foreignInsertId}', '${requests.residentB}', 'association', null, 'Runtime validation message B', '2026-07-19T10:53:39.100Z');
     `);
     const rt05Observation = await observeNoNewEvents('rt05', foreignSubscription, 0, new Date().toISOString());
@@ -335,14 +369,14 @@ async function run() {
     const unrelatedSupport = await subscribeToInserts(
       unrelatedSupportClient,
       'd2b-rt-support-unrelated',
-      'support_messages',
+      'd2_support_messages',
       `support_request_id=eq.${requests.residentA}`,
     );
     subscriptions.push({ client: unrelatedSupportClient, channel: unrelatedSupport.channel });
 
     const unrelatedSupportInsertId = runtimeId();
     psql(`
-      INSERT INTO public.support_messages (id, support_request_id, sender_type, sender_profile_id, content, created_at)
+      INSERT INTO public.d2_support_messages (id, support_request_id, sender_type, sender_profile_id, content, created_at)
       VALUES ('${unrelatedSupportInsertId}', '${requests.residentA}', 'association', null, 'Runtime validation message C', '2026-07-19T10:53:41.000Z');
     `);
     const rt06Observation = await observeNoNewEvents('rt06', unrelatedSupport, 0, new Date().toISOString());
@@ -354,7 +388,7 @@ async function run() {
     const guessedRequestSubscription = await subscribeToInserts(
       guessedRequestClient,
       'd2b-rt-support-guessed-request',
-      'support_messages',
+      'd2_support_messages',
       `support_request_id=eq.${requests.guessed}`,
     );
     subscriptions.push({ client: guessedRequestClient, channel: guessedRequestSubscription.channel });
@@ -366,7 +400,7 @@ async function run() {
 
     const residentReadClient = makeClient(users.residentA);
     const residentSupportRows = await residentReadClient
-      .from('support_messages')
+      .from('d2_support_messages')
       .select('id, tenant_id, property_id, resident_profile_id, support_request_id, delivery_sequence, sender_type, sender_profile_id, content, created_at')
       .order('created_at', { ascending: true });
     const unauthorizedRows = residentSupportRows.data?.filter((row) => row.support_request_id !== requests.residentA) ?? [];
@@ -378,14 +412,14 @@ async function run() {
     const orderedSubscription = await subscribeToInserts(
       orderedSupportClient,
       'd2b-rt-support-ordering',
-      'support_messages',
+      'd2_support_messages',
     );
     subscriptions.push({ client: orderedSupportClient, channel: orderedSubscription.channel });
 
     const orderedInsertA = runtimeId();
     const orderedInsertB = runtimeId();
     psql(`
-      INSERT INTO public.support_messages (id, support_request_id, sender_type, sender_profile_id, content, created_at)
+      INSERT INTO public.d2_support_messages (id, support_request_id, sender_type, sender_profile_id, content, created_at)
       VALUES
         ('${orderedInsertA}', '${requests.residentA}', 'association', null, 'Ordering message 1', '2026-07-19T10:53:42.000Z'),
         ('${orderedInsertB}', '${requests.residentA}', 'association', null, 'Ordering message 2', '2026-07-19T10:53:43.000Z');
@@ -412,17 +446,17 @@ async function run() {
     const revocationSubscription = await subscribeToInserts(
       revocationClient,
       'd2b-rt-support-revocation',
-      'support_messages',
+      'd2_support_messages',
     );
     subscriptions.push({ client: revocationClient, channel: revocationSubscription.channel });
     psql(`
-      UPDATE public.residence_members
+      UPDATE public.d2_residence_members
       SET status = 'revoked'
       WHERE id = '30000000-0000-0000-0000-000000000001';
     `);
     const revokedInsertId = runtimeId();
     psql(`
-      INSERT INTO public.support_messages (id, support_request_id, sender_type, sender_profile_id, content, created_at)
+      INSERT INTO public.d2_support_messages (id, support_request_id, sender_type, sender_profile_id, content, created_at)
       VALUES ('${revokedInsertId}', '${requests.residentA}', 'association', null, 'Revocation message', '2026-07-19T10:53:44.000Z');
     `);
     const rt12Observation = await observeNoNewEvents('rt12', revocationSubscription, 0, new Date().toISOString());
@@ -430,7 +464,7 @@ async function run() {
       failures.push('RT-12 failed: revoked resident still received support events');
     }
     psql(`
-      UPDATE public.residence_members
+      UPDATE public.d2_residence_members
       SET status = 'active'
       WHERE id = '30000000-0000-0000-0000-000000000001';
     `);
@@ -439,21 +473,21 @@ async function run() {
     const tenantASubscription = await subscribeToInserts(
       tenantAClient,
       'd2b-rt-support-tenant-a',
-      'support_messages',
+      'd2_support_messages',
     );
     subscriptions.push({ client: tenantAClient, channel: tenantASubscription.channel });
     const tenantBClient = makeClient(users.residentB);
     const tenantBSubscription = await subscribeToInserts(
       tenantBClient,
       'd2b-rt-support-tenant-b',
-      'support_messages',
+      'd2_support_messages',
     );
     subscriptions.push({ client: tenantBClient, channel: tenantBSubscription.channel });
 
     const tenantAInsert = runtimeId();
     const tenantBInsert = runtimeId();
     psql(`
-      INSERT INTO public.support_messages (id, support_request_id, sender_type, sender_profile_id, content, created_at)
+      INSERT INTO public.d2_support_messages (id, support_request_id, sender_type, sender_profile_id, content, created_at)
       VALUES
         ('${tenantAInsert}', '${requests.residentA}', 'association', null, 'Tenant A message', '2026-07-19T10:53:45.000Z'),
         ('${tenantBInsert}', '${requests.residentB}', 'association', null, 'Tenant B message', '2026-07-19T10:53:46.000Z');
@@ -481,19 +515,19 @@ async function run() {
     const reconnectSubscriptionA = await subscribeToInserts(
       reconnectClient,
       'd2b-rt-support-reconnect-a',
-      'support_messages',
+      'd2_support_messages',
     );
     subscriptions.push({ client: reconnectClient, channel: reconnectSubscriptionA.channel });
     await reconnectSubscriptionA.channel.unsubscribe();
     const reconnectSubscriptionB = await subscribeToInserts(
       reconnectClient,
       'd2b-rt-support-reconnect-b',
-      'support_messages',
+      'd2_support_messages',
     );
     subscriptions.push({ client: reconnectClient, channel: reconnectSubscriptionB.channel });
     const reconnectInsertId = runtimeId();
     psql(`
-      INSERT INTO public.support_messages (id, support_request_id, sender_type, sender_profile_id, content, created_at)
+      INSERT INTO public.d2_support_messages (id, support_request_id, sender_type, sender_profile_id, content, created_at)
       VALUES ('${reconnectInsertId}', '${requests.residentA}', 'association', null, 'Reconnect message', '2026-07-19T10:53:47.000Z');
     `);
     const rt14Delivered = await waitForEventCount(reconnectSubscriptionB.events, 1, DELIVERY_WAIT_MS);
@@ -507,9 +541,9 @@ async function run() {
     const residentProfilesClient = makeClient(users.residentA);
     const operatorProfilesClient = makeClient(users.operatorA);
     const unrelatedProfilesClient = makeClient(users.unrelated);
-    const residentProfilesRows = await residentProfilesClient.from('profiles').select('id');
-    const operatorProfilesRows = await operatorProfilesClient.from('profiles').select('id');
-    const unrelatedProfilesRows = await unrelatedProfilesClient.from('profiles').select('id');
+    const residentProfilesRows = await residentProfilesClient.from('d2_profiles').select('id');
+    const operatorProfilesRows = await operatorProfilesClient.from('d2_profiles').select('id');
+    const unrelatedProfilesRows = await unrelatedProfilesClient.from('d2_profiles').select('id');
 
     evidence.adr09 = {
       selected_model: 'B1 direct resident ownership projection',
@@ -590,7 +624,7 @@ async function run() {
         unrelated_profiles_error: unrelatedProfilesRows.error?.message ?? null,
       },
       pr11_sensitive_field_exposure: {
-        note: 'Direct PostgREST access to profiles is denied because authenticated has no SELECT grant on profiles.',
+        note: 'Direct PostgREST access to d2_profiles is denied because authenticated has no SELECT grant on d2_profiles.',
       },
     };
 

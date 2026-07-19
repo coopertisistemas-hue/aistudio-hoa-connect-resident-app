@@ -16,13 +16,13 @@ SELECT
   has_table_privilege('authenticated', table_regclass, 'DELETE') AS authenticated_delete
 FROM (
   VALUES
-    ('notifications', 'public.notifications'::regclass),
-    ('support_messages', 'public.support_messages'::regclass),
-    ('profiles', 'public.profiles'::regclass),
-    ('profile_contacts', 'public.profile_contacts'::regclass),
-    ('support_requests', 'public.support_requests'::regclass),
-    ('tenant_members', 'public.tenant_members'::regclass),
-    ('tenants', 'public.tenants'::regclass)
+    ('d2_notifications', 'public.d2_notifications'::regclass),
+    ('d2_support_messages', 'public.d2_support_messages'::regclass),
+    ('d2_profiles', 'public.d2_profiles'::regclass),
+    ('d2_profile_contacts', 'public.d2_profile_contacts'::regclass),
+    ('d2_support_requests', 'public.d2_support_requests'::regclass),
+    ('d2_tenant_members', 'public.d2_tenant_members'::regclass),
+    ('d2_tenants', 'public.d2_tenants'::regclass)
 ) AS inspected(table_name, table_regclass);
 
 \echo ''
@@ -36,13 +36,13 @@ JOIN pg_namespace AS n
   ON n.oid = c.relnamespace
 WHERE n.nspname = 'public'
   AND c.relname IN (
-    'notifications',
-    'support_messages',
-    'profiles',
-    'profile_contacts',
-    'support_requests',
-    'residence_members',
-    'tenant_members'
+    'd2_notifications',
+    'd2_support_messages',
+    'd2_profiles',
+    'd2_profile_contacts',
+    'd2_support_requests',
+    'd2_residence_members',
+    'd2_tenant_members'
   )
 ORDER BY c.relname;
 
@@ -52,14 +52,14 @@ SELECT schemaname, tablename, policyname, cmd
 FROM pg_policies
 WHERE schemaname = 'public'
   AND tablename IN (
-    'notifications',
-    'support_messages',
-    'profiles',
-    'profile_contacts',
-    'support_requests',
-    'residence_members',
-    'tenant_members',
-    'profile_correction_audit'
+    'd2_notifications',
+    'd2_support_messages',
+    'd2_profiles',
+    'd2_profile_contacts',
+    'd2_support_requests',
+    'd2_residence_members',
+    'd2_tenant_members',
+    'd2_profile_correction_audit'
   )
 ORDER BY tablename, policyname;
 
@@ -67,7 +67,7 @@ ORDER BY tablename, policyname;
 \echo '--- DB-01 / DB-02 derived ownership projection ---'
 DO $$
 DECLARE
-  inserted_row public.support_messages%ROWTYPE;
+  inserted_row public.d2_support_messages%ROWTYPE;
 BEGIN
   SET LOCAL ROLE authenticated;
   SET LOCAL request.jwt.claim.sub = '10000000-0000-0000-0000-000000000001';
@@ -75,7 +75,7 @@ BEGIN
 
   SELECT *
   INTO inserted_row
-  FROM public.create_support_message(
+  FROM public.d2_create_support_message(
     '70000000-0000-0000-0000-000000000001',
     'Derived ownership message',
     'resident',
@@ -100,7 +100,7 @@ END $$;
 \echo '--- DB-03 / DB-04 spoofed ownership ignored ---'
 DO $$
 DECLARE
-  inserted_row public.support_messages%ROWTYPE;
+  inserted_row public.d2_support_messages%ROWTYPE;
 BEGIN
   SET LOCAL ROLE authenticated;
   SET LOCAL request.jwt.claim.sub = '10000000-0000-0000-0000-000000000001';
@@ -108,7 +108,7 @@ BEGIN
 
   SELECT *
   INTO inserted_row
-  FROM public.create_support_message(
+  FROM public.d2_create_support_message(
     '70000000-0000-0000-0000-000000000001',
     'Spoof attempt message',
     'resident',
@@ -131,7 +131,7 @@ END $$;
 DO $$
 BEGIN
   BEGIN
-    UPDATE public.support_messages
+    UPDATE public.d2_support_messages
     SET tenant_id = '22222222-2222-2222-2222-222222222222'
     WHERE id = '80000000-0000-0000-0000-000000000001';
     RAISE EXCEPTION 'DB-05 FAILED: tenant_id mutation unexpectedly succeeded';
@@ -145,9 +145,9 @@ END $$;
 \echo '--- DB-06 parent mismatch projection overwritten ---'
 DO $$
 DECLARE
-  inserted_row public.support_messages%ROWTYPE;
+  inserted_row public.d2_support_messages%ROWTYPE;
 BEGIN
-  INSERT INTO public.support_messages (
+  INSERT INTO public.d2_support_messages (
     id,
     tenant_id,
     property_id,
@@ -189,7 +189,7 @@ BEGIN
   SET LOCAL request.jwt.claim.role = 'authenticated';
 
   SELECT COUNT(*) INTO cnt
-  FROM public.support_messages
+  FROM public.d2_support_messages
   WHERE tenant_id = '22222222-2222-2222-2222-222222222222';
 
   RAISE NOTICE 'Resident A visible Tenant B support messages: % (expected 0)', cnt;
@@ -209,7 +209,7 @@ BEGIN
   SET LOCAL request.jwt.claim.role = 'authenticated';
 
   SELECT COUNT(*) INTO cnt
-  FROM public.support_messages
+  FROM public.d2_support_messages
   WHERE tenant_id = '11111111-1111-1111-1111-111111111111';
 
   RAISE NOTICE 'Viewer role visible support messages: % (expected 0)', cnt;
@@ -229,7 +229,7 @@ BEGIN
   SET LOCAL request.jwt.claim.role = 'authenticated';
 
   SELECT COUNT(*) INTO cnt
-  FROM public.support_messages
+  FROM public.d2_support_messages
   WHERE tenant_id = '11111111-1111-1111-1111-111111111111';
 
   RAISE NOTICE 'Operator A visible Tenant A support messages: % (expected >= 1)', cnt;
@@ -244,7 +244,7 @@ DO $$
 DECLARE
   cnt integer;
 BEGIN
-  UPDATE public.residence_members
+  UPDATE public.d2_residence_members
   SET status = 'revoked'
   WHERE id = '30000000-0000-0000-0000-000000000001';
 
@@ -253,7 +253,7 @@ BEGIN
   SET LOCAL request.jwt.claim.role = 'authenticated';
 
   SELECT COUNT(*) INTO cnt
-  FROM public.support_messages
+  FROM public.d2_support_messages
   WHERE tenant_id = '11111111-1111-1111-1111-111111111111';
 
   RAISE NOTICE 'Resident A visible support messages after revocation: % (expected 0)', cnt;
@@ -268,7 +268,7 @@ DO $$
 DECLARE
   cnt integer;
 BEGIN
-  UPDATE public.residence_members
+  UPDATE public.d2_residence_members
   SET status = 'active'
   WHERE id = '30000000-0000-0000-0000-000000000001';
 
@@ -276,11 +276,11 @@ BEGIN
   SET LOCAL request.jwt.claim.sub = '10000000-0000-0000-0000-000000000001';
   SET LOCAL request.jwt.claim.role = 'authenticated';
 
-  SELECT COUNT(*) INTO cnt FROM public.notifications;
+  SELECT COUNT(*) INTO cnt FROM public.d2_notifications;
   RAISE NOTICE 'notifications visible to Resident A: % (expected 0 before runtime inserts)', cnt;
 
   SELECT COUNT(*) INTO cnt
-  FROM public.support_messages
+  FROM public.d2_support_messages
   WHERE resident_profile_id = '20000000-0000-0000-0000-000000000001';
   RAISE NOTICE 'Resident A visible direct support messages: % (expected >= 1)', cnt;
   IF cnt < 1 THEN
@@ -288,7 +288,7 @@ BEGIN
   END IF;
 
   BEGIN
-    PERFORM 1 FROM public.tenants;
+    PERFORM 1 FROM public.d2_tenants;
     RAISE EXCEPTION 'RT-08 FAILED: tenants SELECT should be denied';
   EXCEPTION
     WHEN insufficient_privilege THEN
@@ -296,7 +296,7 @@ BEGIN
   END;
 
   BEGIN
-    PERFORM 1 FROM public.profiles;
+    PERFORM 1 FROM public.d2_profiles;
     RAISE EXCEPTION 'RT-08 FAILED: profiles SELECT should be denied to authenticated';
   EXCEPTION
     WHEN insufficient_privilege THEN
@@ -304,7 +304,7 @@ BEGIN
   END;
 
   BEGIN
-    PERFORM 1 FROM public.support_requests;
+    PERFORM 1 FROM public.d2_support_requests;
     RAISE EXCEPTION 'RT-08 FAILED: support_requests SELECT should be denied';
   EXCEPTION
     WHEN insufficient_privilege THEN
@@ -323,7 +323,7 @@ BEGIN
   SET LOCAL request.jwt.claim.role = 'authenticated';
 
   SELECT COUNT(*) INTO cnt
-  FROM public.profiles
+  FROM public.d2_profiles
   WHERE id = '20000000-0000-0000-0000-000000000001';
 
   IF cnt <> 1 THEN
@@ -341,12 +341,12 @@ BEGIN
   SET LOCAL request.jwt.claim.sub = '10000000-0000-0000-0000-000000000001';
   SET LOCAL request.jwt.claim.role = 'authenticated';
 
-  UPDATE public.profiles
+  UPDATE public.d2_profiles
   SET preferred_name = 'Ana Validated'
   WHERE user_id = '10000000-0000-0000-0000-000000000001';
 
   SELECT preferred_name INTO changed
-  FROM public.profiles
+  FROM public.d2_profiles
   WHERE id = '20000000-0000-0000-0000-000000000001';
 
   IF changed <> 'Ana Validated' THEN
@@ -363,7 +363,7 @@ BEGIN
   SET LOCAL request.jwt.claim.role = 'authenticated';
 
   BEGIN
-    UPDATE public.profiles
+    UPDATE public.d2_profiles
     SET document = 'CPF-HACKED'
     WHERE user_id = '10000000-0000-0000-0000-000000000001';
     RAISE EXCEPTION 'PR-03 FAILED: document update unexpectedly succeeded';
@@ -384,7 +384,7 @@ BEGIN
   SET LOCAL request.jwt.claim.role = 'authenticated';
 
   SELECT COUNT(*) INTO cnt
-  FROM public.profiles
+  FROM public.d2_profiles
   WHERE id = '20000000-0000-0000-0000-000000000002';
 
   IF cnt <> 0 THEN
@@ -403,7 +403,7 @@ BEGIN
   SET LOCAL request.jwt.claim.role = 'authenticated';
 
   SELECT COUNT(*) INTO cnt
-  FROM public.profiles
+  FROM public.d2_profiles
   WHERE id = '20000000-0000-0000-0000-000000000001';
 
   IF cnt <> 1 THEN
@@ -422,7 +422,7 @@ BEGIN
   SET LOCAL request.jwt.claim.role = 'authenticated';
 
   SELECT COUNT(*) INTO cnt
-  FROM public.profiles
+  FROM public.d2_profiles
   WHERE id = '20000000-0000-0000-0000-000000000002';
 
   IF cnt <> 0 THEN
@@ -441,7 +441,7 @@ BEGIN
   SET LOCAL request.jwt.claim.role = 'authenticated';
 
   SELECT COUNT(*) INTO cnt
-  FROM public.profiles
+  FROM public.d2_profiles
   WHERE id IN (
     '20000000-0000-0000-0000-000000000001',
     '20000000-0000-0000-0000-000000000002'
@@ -463,7 +463,7 @@ BEGIN
   SET LOCAL request.jwt.claim.role = 'authenticated';
 
   SELECT COUNT(*) INTO cnt
-  FROM public.profiles
+  FROM public.d2_profiles
   WHERE id IN (
     '20000000-0000-0000-0000-000000000001',
     '20000000-0000-0000-0000-000000000002'
@@ -486,7 +486,7 @@ BEGIN
   SET LOCAL request.jwt.claim.sub = '10000000-0000-0000-0000-000000000006';
   SET LOCAL request.jwt.claim.role = 'authenticated';
 
-  SELECT public.apply_profile_correction(
+  SELECT public.d2_apply_profile_correction(
     '20000000-0000-0000-0000-000000000002',
     'CPF-B-CORRECTED',
     'Validation governance path'
@@ -494,11 +494,11 @@ BEGIN
   INTO audit_id;
 
   SELECT document INTO updated_document
-  FROM public.profiles
+  FROM public.d2_profiles
   WHERE id = '20000000-0000-0000-0000-000000000002';
 
   SELECT COUNT(*) INTO audit_count
-  FROM public.profile_correction_audit
+  FROM public.d2_profile_correction_audit
   WHERE id = audit_id
     AND actor_user_id = '10000000-0000-0000-0000-000000000006';
 
@@ -519,14 +519,14 @@ BEGIN
   SET LOCAL request.jwt.claim.role = 'authenticated';
 
   SELECT COUNT(*) INTO cnt
-  FROM public.profile_contacts
+  FROM public.d2_profile_contacts
   WHERE profile_id = '20000000-0000-0000-0000-000000000001';
   IF cnt <> 1 THEN
     RAISE EXCEPTION 'PR-12 FAILED: self contact read';
   END IF;
 
   SELECT COUNT(*) INTO cnt
-  FROM public.profile_contacts
+  FROM public.d2_profile_contacts
   WHERE profile_id = '20000000-0000-0000-0000-000000000002';
   IF cnt <> 0 THEN
     RAISE EXCEPTION 'PR-12 FAILED: cross-tenant contact read';
@@ -538,13 +538,13 @@ BEGIN
   SET LOCAL request.jwt.claim.sub = '10000000-0000-0000-0000-000000000004';
   SET LOCAL request.jwt.claim.role = 'authenticated';
 
-  UPDATE public.profile_contacts
+  UPDATE public.d2_profile_contacts
   SET verification_state = 'verified',
       verified_at = now()
   WHERE id = '60000000-0000-0000-0000-000000000001';
 
   SELECT verification_state INTO new_state
-  FROM public.profile_contacts
+  FROM public.d2_profile_contacts
   WHERE id = '60000000-0000-0000-0000-000000000001';
 
   IF new_state <> 'verified' THEN
@@ -552,7 +552,7 @@ BEGIN
   END IF;
 
   BEGIN
-    UPDATE public.profile_contacts
+    UPDATE public.d2_profile_contacts
     SET normalized_value = 'tampered@example.com'
     WHERE id = '60000000-0000-0000-0000-000000000001';
     RAISE EXCEPTION 'PR-12 FAILED: normalized_value update unexpectedly succeeded';
@@ -567,25 +567,25 @@ END $$;
 SELECT indexname, indexdef
 FROM pg_indexes
 WHERE schemaname = 'public'
-  AND tablename IN ('profiles', 'profile_contacts', 'tenant_members', 'residence_members', 'notifications', 'support_messages', 'support_requests')
+  AND tablename IN ('d2_profiles', 'd2_profile_contacts', 'd2_tenant_members', 'd2_residence_members', 'd2_notifications', 'd2_support_messages', 'd2_support_requests')
 ORDER BY tablename, indexname;
 
 EXPLAIN (COSTS OFF)
 SELECT sm.id
-FROM public.support_messages AS sm
+FROM public.d2_support_messages AS sm
 WHERE sm.tenant_id = '11111111-1111-1111-1111-111111111111'
   AND sm.resident_profile_id = '20000000-0000-0000-0000-000000000001'
 ORDER BY sm.created_at, sm.id;
 
 EXPLAIN (COSTS OFF)
 SELECT sm.id
-FROM public.support_messages AS sm
+FROM public.d2_support_messages AS sm
 WHERE sm.support_request_id = '70000000-0000-0000-0000-000000000001'
 ORDER BY sm.created_at, sm.id;
 
 EXPLAIN (COSTS OFF)
 SELECT sm.id
-FROM public.support_messages AS sm
+FROM public.d2_support_messages AS sm
 WHERE sm.tenant_id = '22222222-2222-2222-2222-222222222222'
   AND sm.resident_profile_id = '20000000-0000-0000-0000-000000000001';
 

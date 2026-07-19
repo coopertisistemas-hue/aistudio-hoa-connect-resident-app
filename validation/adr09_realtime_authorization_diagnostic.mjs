@@ -249,7 +249,7 @@ function latestStatus(statuses) {
 
 function installDiagnosticObjects() {
   psql(`
-    CREATE OR REPLACE FUNCTION public.current_tenant_ids()
+    CREATE OR REPLACE FUNCTION public.d2_current_tenant_ids()
     RETURNS uuid[]
     LANGUAGE sql
     STABLE
@@ -257,12 +257,12 @@ function installDiagnosticObjects() {
     SET search_path = ''
     AS $$
       SELECT COALESCE(array_agg(DISTINCT rm.tenant_id), '{}'::uuid[])
-      FROM public.residence_members AS rm
-      WHERE rm.profile_id = public.current_profile_id()
+      FROM public.d2_residence_members AS rm
+      WHERE rm.profile_id = public.d2_current_profile_id()
         AND rm.status = 'active';
     $$;
 
-    CREATE OR REPLACE FUNCTION public.realtime_identity_probe()
+    CREATE OR REPLACE FUNCTION public.d2_realtime_identity_probe()
     RETURNS jsonb
     LANGUAGE sql
     STABLE
@@ -278,27 +278,27 @@ function installDiagnosticObjects() {
         'jwt_aud', current_setting('request.jwt.claim.aud', true),
         'jwt_exp', current_setting('request.jwt.claim.exp', true),
         'jwt_iss', current_setting('request.jwt.claim.iss', true),
-        'current_profile_id', public.current_profile_id(),
-        'current_tenant_ids', public.current_tenant_ids()
+        'current_profile_id', public.d2_current_profile_id(),
+        'current_tenant_ids', public.d2_current_tenant_ids()
       );
     $$;
 
-    DROP TABLE IF EXISTS public.realtime_owner_probe CASCADE;
+    DROP TABLE IF EXISTS public.d2_realtime_owner_probe CASCADE;
 
-    CREATE TABLE public.realtime_owner_probe (
+    CREATE TABLE public.d2_realtime_owner_probe (
       id uuid PRIMARY KEY,
       owner_user_id uuid NOT NULL,
       payload text NOT NULL,
       created_at timestamptz NOT NULL DEFAULT now()
     );
 
-    ALTER TABLE public.realtime_owner_probe ENABLE ROW LEVEL SECURITY;
-    ALTER TABLE public.realtime_owner_probe FORCE ROW LEVEL SECURITY;
+    ALTER TABLE public.d2_realtime_owner_probe ENABLE ROW LEVEL SECURITY;
+    ALTER TABLE public.d2_realtime_owner_probe FORCE ROW LEVEL SECURITY;
 
-    REVOKE ALL ON public.realtime_owner_probe FROM anon, authenticated;
-    GRANT SELECT ON public.realtime_owner_probe TO authenticated;
-    GRANT EXECUTE ON FUNCTION public.current_tenant_ids() TO authenticated;
-    GRANT EXECUTE ON FUNCTION public.realtime_identity_probe() TO authenticated;
+    REVOKE ALL ON public.d2_realtime_owner_probe FROM anon, authenticated;
+    GRANT SELECT ON public.d2_realtime_owner_probe TO authenticated;
+    GRANT EXECUTE ON FUNCTION public.d2_current_tenant_ids() TO authenticated;
+    GRANT EXECUTE ON FUNCTION public.d2_realtime_identity_probe() TO authenticated;
 
     DO $$
     BEGIN
@@ -307,13 +307,13 @@ function installDiagnosticObjects() {
         FROM pg_publication_tables
         WHERE pubname = 'supabase_realtime'
           AND schemaname = 'public'
-          AND tablename = 'realtime_owner_probe'
+          AND tablename = 'd2_realtime_owner_probe'
       ) THEN
-        EXECUTE 'ALTER PUBLICATION supabase_realtime DROP TABLE public.realtime_owner_probe';
+        EXECUTE 'ALTER PUBLICATION supabase_realtime DROP TABLE public.d2_realtime_owner_probe';
       END IF;
     END $$;
 
-    ALTER PUBLICATION supabase_realtime ADD TABLE public.realtime_owner_probe;
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.d2_realtime_owner_probe;
   `);
 }
 
@@ -324,27 +324,27 @@ function setReplicaIdentity(tableName, identity) {
 function createSupportPolicies({ scope, expression, includeOperator = false, includePlatformAdmin = false }) {
   const toClause = scope === 'authenticated' ? ' TO authenticated' : '';
   psql(`
-    DROP POLICY IF EXISTS support_messages_select_resident_policy ON public.support_messages;
-    DROP POLICY IF EXISTS support_messages_select_operator_policy ON public.support_messages;
-    DROP POLICY IF EXISTS support_messages_select_platform_admin_policy ON public.support_messages;
+    DROP POLICY IF EXISTS support_messages_select_resident_policy ON public.d2_support_messages;
+    DROP POLICY IF EXISTS support_messages_select_operator_policy ON public.d2_support_messages;
+    DROP POLICY IF EXISTS support_messages_select_platform_admin_policy ON public.d2_support_messages;
 
     CREATE POLICY support_messages_select_resident_policy
-    ON public.support_messages
+    ON public.d2_support_messages
     FOR SELECT${toClause}
     USING (${expression});
 
     ${includeOperator ? `
       CREATE POLICY support_messages_select_operator_policy
-      ON public.support_messages
+      ON public.d2_support_messages
       FOR SELECT${toClause}
-      USING (public.is_authorized_operator(tenant_id));
+      USING (public.d2_is_authorized_operator(tenant_id));
     ` : ''}
 
     ${includePlatformAdmin ? `
       CREATE POLICY support_messages_select_platform_admin_policy
-      ON public.support_messages
+      ON public.d2_support_messages
       FOR SELECT${toClause}
-      USING (public.is_platform_admin());
+      USING (public.d2_is_platform_admin());
     ` : ''}
   `);
 }
@@ -352,9 +352,9 @@ function createSupportPolicies({ scope, expression, includeOperator = false, inc
 function createControlPolicy(scope) {
   const toClause = scope === 'authenticated' ? ' TO authenticated' : '';
   psql(`
-    DROP POLICY IF EXISTS realtime_owner_probe_select_policy ON public.realtime_owner_probe;
+    DROP POLICY IF EXISTS realtime_owner_probe_select_policy ON public.d2_realtime_owner_probe;
     CREATE POLICY realtime_owner_probe_select_policy
-    ON public.realtime_owner_probe
+    ON public.d2_realtime_owner_probe
     FOR SELECT${toClause}
     USING (owner_user_id = auth.uid());
   `);
@@ -372,21 +372,21 @@ async function runSupportVariant(variant, tokens) {
   const variantClients = buildVariantClients(tokens);
   createSupportPolicies(variant.policy);
   if (variant.replicaIdentityFull) {
-    setReplicaIdentity('support_messages', 'FULL');
+    setReplicaIdentity('d2_support_messages', 'FULL');
   } else {
-    setReplicaIdentity('support_messages', 'DEFAULT');
+    setReplicaIdentity('d2_support_messages', 'DEFAULT');
   }
 
   const residentSub = await subscribeToInserts(
     variantClients.residentA,
     `adr09-support-${variant.id}-resident-a`,
-    'support_messages',
+    'd2_support_messages',
     variant.filter ?? null,
   );
 
   const insertId = runtimeId();
   psql(`
-    INSERT INTO public.support_messages (id, support_request_id, sender_type, sender_profile_id, content, created_at)
+    INSERT INTO public.d2_support_messages (id, support_request_id, sender_type, sender_profile_id, content, created_at)
     VALUES ('${insertId}', '${requests.residentA}', 'association', null, '${variant.id} authorized message', '${nowIso()}');
   `);
 
@@ -395,12 +395,12 @@ async function runSupportVariant(variant, tokens) {
   const foreignSub = await subscribeToInserts(
     variantClients.residentA,
     `adr09-support-${variant.id}-foreign`,
-    'support_messages',
+    'd2_support_messages',
     `support_request_id=eq.${requests.residentB}`,
   );
   const foreignInsertId = runtimeId();
   psql(`
-    INSERT INTO public.support_messages (id, support_request_id, sender_type, sender_profile_id, content, created_at)
+    INSERT INTO public.d2_support_messages (id, support_request_id, sender_type, sender_profile_id, content, created_at)
     VALUES ('${foreignInsertId}', '${requests.residentB}', 'association', null, '${variant.id} foreign message', '${nowIso()}');
   `);
   const foreignObservation = await observeNoNewEvents(foreignSub, 0);
@@ -408,18 +408,18 @@ async function runSupportVariant(variant, tokens) {
   const unrelatedSub = await subscribeToInserts(
     variantClients.unrelated,
     `adr09-support-${variant.id}-unrelated`,
-    'support_messages',
+    'd2_support_messages',
     `support_request_id=eq.${requests.residentA}`,
   );
   const unrelatedInsertId = runtimeId();
   psql(`
-    INSERT INTO public.support_messages (id, support_request_id, sender_type, sender_profile_id, content, created_at)
+    INSERT INTO public.d2_support_messages (id, support_request_id, sender_type, sender_profile_id, content, created_at)
     VALUES ('${unrelatedInsertId}', '${requests.residentA}', 'association', null, '${variant.id} unrelated message', '${nowIso()}');
   `);
   const unrelatedObservation = await observeNoNewEvents(unrelatedSub, 0);
 
   const directRead = await variantClients.residentA
-    .from('support_messages')
+    .from('d2_support_messages')
     .select('id, resident_user_id, resident_access_revoked, support_request_id')
     .order('created_at', { ascending: true });
 
@@ -474,16 +474,16 @@ async function runSupportVariant(variant, tokens) {
 async function runControlVariant(scope, tokens) {
   const variantClients = buildVariantClients(tokens);
   createControlPolicy(scope);
-  setReplicaIdentity('realtime_owner_probe', 'DEFAULT');
+  setReplicaIdentity('d2_realtime_owner_probe', 'DEFAULT');
 
   const ownerSub = await subscribeToInserts(
     variantClients.residentA,
     `adr09-control-${scope}-owner`,
-    'realtime_owner_probe',
+    'd2_realtime_owner_probe',
   );
   const ownerInsertId = runtimeId();
   psql(`
-    INSERT INTO public.realtime_owner_probe (id, owner_user_id, payload, created_at)
+    INSERT INTO public.d2_realtime_owner_probe (id, owner_user_id, payload, created_at)
     VALUES ('${ownerInsertId}', '${users.residentA}', 'owner ${scope}', '${nowIso()}');
   `);
   await waitForEventCount(ownerSub.events, 1, DELIVERY_WAIT_MS);
@@ -491,11 +491,11 @@ async function runControlVariant(scope, tokens) {
   const foreignSub = await subscribeToInserts(
     variantClients.residentA,
     `adr09-control-${scope}-foreign`,
-    'realtime_owner_probe',
+    'd2_realtime_owner_probe',
   );
   const foreignInsertId = runtimeId();
   psql(`
-    INSERT INTO public.realtime_owner_probe (id, owner_user_id, payload, created_at)
+    INSERT INTO public.d2_realtime_owner_probe (id, owner_user_id, payload, created_at)
     VALUES ('${foreignInsertId}', '${users.residentB}', 'foreign ${scope}', '${nowIso()}');
   `);
   const foreignObservation = await observeNoNewEvents(foreignSub, 0);
@@ -503,11 +503,11 @@ async function runControlVariant(scope, tokens) {
   const unrelatedSub = await subscribeToInserts(
     variantClients.unrelated,
     `adr09-control-${scope}-unrelated`,
-    'realtime_owner_probe',
+    'd2_realtime_owner_probe',
   );
   const unrelatedInsertId = runtimeId();
   psql(`
-    INSERT INTO public.realtime_owner_probe (id, owner_user_id, payload, created_at)
+    INSERT INTO public.d2_realtime_owner_probe (id, owner_user_id, payload, created_at)
     VALUES ('${unrelatedInsertId}', '${users.residentA}', 'unrelated ${scope}', '${nowIso()}');
   `);
   const unrelatedObservation = await observeNoNewEvents(unrelatedSub, 0);
@@ -557,7 +557,7 @@ async function runFilterMatrix(tokens) {
     includeOperator: true,
     includePlatformAdmin: true,
   });
-  setReplicaIdentity('support_messages', 'DEFAULT');
+  setReplicaIdentity('d2_support_messages', 'DEFAULT');
 
   const filters = [
     { name: 'none', value: null },
@@ -573,13 +573,13 @@ async function runFilterMatrix(tokens) {
     const subscription = await subscribeToInserts(
       variantClients.residentA,
       `adr09-filter-${filter.name}`,
-      'support_messages',
+      'd2_support_messages',
       filter.value,
     );
 
     const insertId = runtimeId();
     psql(`
-      INSERT INTO public.support_messages (id, support_request_id, sender_type, sender_profile_id, content, created_at)
+      INSERT INTO public.d2_support_messages (id, support_request_id, sender_type, sender_profile_id, content, created_at)
       VALUES ('${insertId}', '${requests.residentA}', 'association', null, 'filter ${filter.name}', '${nowIso()}');
     `);
     await waitForEventCount(subscription.events, 1, DELIVERY_WAIT_MS);
@@ -612,16 +612,16 @@ function getPublicationAndPolicyMetadata() {
       SELECT schemaname, tablename
       FROM pg_publication_tables
       WHERE pubname = 'supabase_realtime'
-        AND tablename IN ('notifications', 'support_messages', 'realtime_owner_probe')
+        AND tablename IN ('d2_notifications', 'd2_support_messages', 'd2_realtime_owner_probe')
       ORDER BY tablename
     `),
     replica_identity: psqlJson(`
       SELECT c.relname AS table_name, c.relreplident
       FROM pg_class AS c
       WHERE c.oid IN (
-        'public.notifications'::regclass,
-        'public.support_messages'::regclass,
-        'public.realtime_owner_probe'::regclass
+        'public.d2_notifications'::regclass,
+        'public.d2_support_messages'::regclass,
+        'public.d2_realtime_owner_probe'::regclass
       )
       ORDER BY c.relname
     `),
@@ -629,9 +629,9 @@ function getPublicationAndPolicyMetadata() {
       SELECT c.relname AS table_name, c.relrowsecurity, c.relforcerowsecurity
       FROM pg_class AS c
       WHERE c.oid IN (
-        'public.notifications'::regclass,
-        'public.support_messages'::regclass,
-        'public.realtime_owner_probe'::regclass
+        'public.d2_notifications'::regclass,
+        'public.d2_support_messages'::regclass,
+        'public.d2_realtime_owner_probe'::regclass
       )
       ORDER BY c.relname
     `),
@@ -639,7 +639,7 @@ function getPublicationAndPolicyMetadata() {
       SELECT table_name, grantee, privilege_type
       FROM information_schema.role_table_grants
       WHERE table_schema = 'public'
-        AND table_name IN ('notifications', 'support_messages', 'realtime_owner_probe')
+        AND table_name IN ('d2_notifications', 'd2_support_messages', 'd2_realtime_owner_probe')
         AND grantee IN ('anon', 'authenticated')
       ORDER BY table_name, grantee, privilege_type
     `),
@@ -647,7 +647,7 @@ function getPublicationAndPolicyMetadata() {
       SELECT tablename, policyname, roles, qual
       FROM pg_policies
       WHERE schemaname = 'public'
-        AND tablename IN ('notifications', 'support_messages', 'realtime_owner_probe')
+        AND tablename IN ('d2_notifications', 'd2_support_messages', 'd2_realtime_owner_probe')
       ORDER BY tablename, policyname
     `),
   };
@@ -663,20 +663,20 @@ function getTableStructureDiff() {
        AND kcu.table_schema = tc.table_schema
       WHERE tc.table_schema = 'public'
         AND tc.constraint_type = 'PRIMARY KEY'
-        AND tc.table_name IN ('notifications', 'support_messages')
+        AND tc.table_name IN ('d2_notifications', 'd2_support_messages')
       ORDER BY tc.table_name, kcu.ordinal_position
     `),
     columns: psqlJson(`
       SELECT table_name, column_name, data_type, is_nullable, column_default
       FROM information_schema.columns
       WHERE table_schema = 'public'
-        AND table_name IN ('notifications', 'support_messages')
+        AND table_name IN ('d2_notifications', 'd2_support_messages')
       ORDER BY table_name, ordinal_position
     `),
     foreign_keys: psqlJson(`
       SELECT conrelid::regclass::text AS table_name, conname, pg_get_constraintdef(oid) AS definition
       FROM pg_constraint
-      WHERE conrelid IN ('public.notifications'::regclass, 'public.support_messages'::regclass)
+      WHERE conrelid IN ('public.d2_notifications'::regclass, 'public.d2_support_messages'::regclass)
         AND contype = 'f'
       ORDER BY conrelid::regclass::text, conname
     `),
@@ -684,7 +684,7 @@ function getTableStructureDiff() {
       SELECT event_object_table AS table_name, trigger_name, action_timing, event_manipulation
       FROM information_schema.triggers
       WHERE trigger_schema = 'public'
-        AND event_object_table IN ('notifications', 'support_messages')
+        AND event_object_table IN ('d2_notifications', 'd2_support_messages')
       ORDER BY event_object_table, trigger_name
     `),
   };
@@ -774,9 +774,9 @@ async function main() {
     unrelated: createAuthedClient(unrelatedToken),
   };
 
-  const identityProbe = await clients.residentA.rpc('realtime_identity_probe');
+  const identityProbe = await clients.residentA.rpc('d2_realtime_identity_probe');
   const residentARows = await clients.residentA
-    .from('support_messages')
+    .from('d2_support_messages')
     .select('id, tenant_id, resident_profile_id, resident_user_id, resident_access_revoked, support_request_id')
     .eq('support_request_id', requests.residentA)
     .order('created_at', { ascending: true });
@@ -789,7 +789,7 @@ async function main() {
 
   const supportRowSample = psqlJson(`
     SELECT id, tenant_id, resident_profile_id, resident_user_id, resident_access_revoked, support_request_id
-    FROM public.support_messages
+    FROM public.d2_support_messages
     WHERE support_request_id = '${requests.residentA}'::uuid
     ORDER BY created_at
     LIMIT 1
@@ -823,13 +823,13 @@ async function main() {
     },
     {
       id: 'P4_public_profile',
-      description: 'USING (resident_profile_id = current_profile_id()) with no TO clause',
-      policy: { scope: 'public', expression: 'resident_profile_id = public.current_profile_id()' },
+      description: 'USING (resident_profile_id = d2_current_profile_id()) with no TO clause',
+      policy: { scope: 'public', expression: 'resident_profile_id = public.d2_current_profile_id()' },
     },
     {
       id: 'P5_public_tenant',
-      description: 'USING (tenant_id = ANY(current_tenant_ids())) with no TO clause',
-      policy: { scope: 'public', expression: 'tenant_id = ANY(public.current_tenant_ids())' },
+      description: 'USING (tenant_id = ANY(d2_current_tenant_ids())) with no TO clause',
+      policy: { scope: 'public', expression: 'tenant_id = ANY(public.d2_current_tenant_ids())' },
     },
     {
       id: 'P6_final_public',
