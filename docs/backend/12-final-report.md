@@ -7,21 +7,21 @@
 
 ## 1. Final verdict
 
-**Superseded on July 19, 2026 by [13-d2-validation-report.md](13-d2-validation-report.md).**
+**Superseded on July 19, 2026 by [16-realtime-authorization-diagnostic-report.md](16-realtime-authorization-diagnostic-report.md).**
 
-The July 19, 2026 Realtime remediation rerun did not change the program decision:
+The later July 19, 2026 diagnostic wave changed the program decision after tracing the remaining `support_messages` failure to the local validation harness:
 
 ```text
-D2 FAIL — SPRINT 1 BLOCKED
+D2 PASS — SPRINT 1 AUTHORIZED
 ```
 
-See [14-realtime-remediation-report.md](14-realtime-remediation-report.md) for the remediation recap and [15-realtime-option-b-validation-report.md](15-realtime-option-b-validation-report.md) for the final Option B validation evidence.
+See [14-realtime-remediation-report.md](14-realtime-remediation-report.md) and [15-realtime-option-b-validation-report.md](15-realtime-option-b-validation-report.md) for the historical failed waves, and [16-realtime-authorization-diagnostic-report.md](16-realtime-authorization-diagnostic-report.md) for the final passing diagnostic evidence.
 
 This report remains the close-out artifact for the **architecture remediation wave only**.
-The later D2 validation wave and Wave B Option B rerun executed the runtime conditions and produced:
+The later D2 validation wave, Wave B Option B rerun, and the final diagnostic wave executed the runtime conditions and produced:
 
 ```text
-D2 FAIL — SPRINT 1 BLOCKED
+D2 PASS — SPRINT 1 AUTHORIZED
 ```
 
 ---

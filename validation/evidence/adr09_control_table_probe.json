@@ -1,0 +1,287 @@
+{
+  "generated_at": "2026-07-19T15:11:19.483Z",
+  "control_results": [
+    {
+      "scope": "authenticated",
+      "authorized": {
+        "channel_status": "SUBSCRIBED",
+        "statuses": [
+          {
+            "status": "SUBSCRIBED",
+            "error": null,
+            "at": "2026-07-19T15:10:35.269Z"
+          },
+          {
+            "status": "CLOSED",
+            "error": null,
+            "at": "2026-07-19T15:10:40.425Z"
+          },
+          {
+            "status": "CLOSED",
+            "error": null,
+            "at": "2026-07-19T15:10:40.428Z"
+          }
+        ],
+        "events": [
+          {
+            "received_at": "2026-07-19T15:10:35.956Z",
+            "payload": {
+              "schema": "public",
+              "table": "realtime_owner_probe",
+              "commit_timestamp": "2026-07-19T15:10:35.615Z",
+              "eventType": "INSERT",
+              "new": {
+                "id": "af0fa3c6-f5f6-4f0a-ad69-81b32a39082a",
+                "payload": "owner authenticated",
+                "created_at": "2026-07-19T15:10:35.52+00:00",
+                "owner_user_id": "10000000-0000-0000-0000-000000000001"
+              },
+              "old": {},
+              "errors": null
+            }
+          },
+          {
+            "received_at": "2026-07-19T15:10:39.097Z",
+            "payload": {
+              "schema": "public",
+              "table": "realtime_owner_probe",
+              "commit_timestamp": "2026-07-19T15:10:38.593Z",
+              "eventType": "INSERT",
+              "new": {
+                "id": "c63d92b4-56a1-4e5f-886e-61c2829f85d7",
+                "payload": "unrelated authenticated",
+                "created_at": "2026-07-19T15:10:38.458+00:00",
+                "owner_user_id": "10000000-0000-0000-0000-000000000001"
+              },
+              "old": {},
+              "errors": null
+            }
+          }
+        ],
+        "authorized_rows": [
+          {
+            "id": "af0fa3c6-f5f6-4f0a-ad69-81b32a39082a",
+            "payload": "owner authenticated",
+            "created_at": "2026-07-19T15:10:35.52+00:00",
+            "owner_user_id": "10000000-0000-0000-0000-000000000001"
+          },
+          {
+            "id": "c63d92b4-56a1-4e5f-886e-61c2829f85d7",
+            "payload": "unrelated authenticated",
+            "created_at": "2026-07-19T15:10:38.458+00:00",
+            "owner_user_id": "10000000-0000-0000-0000-000000000001"
+          }
+        ],
+        "unauthorized_envelopes": []
+      },
+      "foreign": {
+        "channel_status": "SUBSCRIBED",
+        "statuses": [
+          {
+            "status": "SUBSCRIBED",
+            "error": null,
+            "at": "2026-07-19T15:10:36.032Z"
+          },
+          {
+            "status": "CLOSED",
+            "error": null,
+            "at": "2026-07-19T15:10:40.426Z"
+          },
+          {
+            "status": "CLOSED",
+            "error": null,
+            "at": "2026-07-19T15:10:40.428Z"
+          }
+        ],
+        "observation": {
+          "baseline_count": 0,
+          "final_count": 1,
+          "passed": false,
+          "received_event_buffer": [
+            {
+              "received_at": "2026-07-19T15:10:36.486Z",
+              "payload": {
+                "schema": "public",
+                "table": "realtime_owner_probe",
+                "commit_timestamp": null,
+                "eventType": "INSERT",
+                "new": {},
+                "old": {},
+                "errors": [
+                  "Error 401: Unauthorized"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "unrelated": {
+        "channel_status": "SUBSCRIBED",
+        "statuses": [
+          {
+            "status": "SUBSCRIBED",
+            "error": null,
+            "at": "2026-07-19T15:10:38.208Z"
+          },
+          {
+            "status": "CLOSED",
+            "error": null,
+            "at": "2026-07-19T15:10:40.427Z"
+          },
+          {
+            "status": "CLOSED",
+            "error": null,
+            "at": "2026-07-19T15:10:40.428Z"
+          }
+        ],
+        "observation": {
+          "baseline_count": 0,
+          "final_count": 0,
+          "passed": true,
+          "received_event_buffer": []
+        }
+      }
+    },
+    {
+      "scope": "public",
+      "authorized": {
+        "channel_status": "SUBSCRIBED",
+        "statuses": [
+          {
+            "status": "SUBSCRIBED",
+            "error": null,
+            "at": "2026-07-19T15:10:40.703Z"
+          },
+          {
+            "status": "CLOSED",
+            "error": null,
+            "at": "2026-07-19T15:10:45.664Z"
+          },
+          {
+            "status": "CLOSED",
+            "error": null,
+            "at": "2026-07-19T15:10:45.665Z"
+          }
+        ],
+        "events": [
+          {
+            "received_at": "2026-07-19T15:10:41.191Z",
+            "payload": {
+              "schema": "public",
+              "table": "realtime_owner_probe",
+              "commit_timestamp": "2026-07-19T15:10:41.062Z",
+              "eventType": "INSERT",
+              "new": {
+                "id": "b5010fef-9042-4ef9-a570-e91f361e2e82",
+                "payload": "owner public",
+                "created_at": "2026-07-19T15:10:40.953+00:00",
+                "owner_user_id": "10000000-0000-0000-0000-000000000001"
+              },
+              "old": {},
+              "errors": null
+            }
+          },
+          {
+            "received_at": "2026-07-19T15:10:44.320Z",
+            "payload": {
+              "schema": "public",
+              "table": "realtime_owner_probe",
+              "commit_timestamp": "2026-07-19T15:10:43.835Z",
+              "eventType": "INSERT",
+              "new": {
+                "id": "02dabdcc-8523-443a-8f98-357111490e4a",
+                "payload": "unrelated public",
+                "created_at": "2026-07-19T15:10:43.727+00:00",
+                "owner_user_id": "10000000-0000-0000-0000-000000000001"
+              },
+              "old": {},
+              "errors": null
+            }
+          }
+        ],
+        "authorized_rows": [
+          {
+            "id": "b5010fef-9042-4ef9-a570-e91f361e2e82",
+            "payload": "owner public",
+            "created_at": "2026-07-19T15:10:40.953+00:00",
+            "owner_user_id": "10000000-0000-0000-0000-000000000001"
+          },
+          {
+            "id": "02dabdcc-8523-443a-8f98-357111490e4a",
+            "payload": "unrelated public",
+            "created_at": "2026-07-19T15:10:43.727+00:00",
+            "owner_user_id": "10000000-0000-0000-0000-000000000001"
+          }
+        ],
+        "unauthorized_envelopes": []
+      },
+      "foreign": {
+        "channel_status": "SUBSCRIBED",
+        "statuses": [
+          {
+            "status": "SUBSCRIBED",
+            "error": null,
+            "at": "2026-07-19T15:10:41.284Z"
+          },
+          {
+            "status": "CLOSED",
+            "error": null,
+            "at": "2026-07-19T15:10:45.665Z"
+          },
+          {
+            "status": "CLOSED",
+            "error": null,
+            "at": "2026-07-19T15:10:45.665Z"
+          }
+        ],
+        "observation": {
+          "baseline_count": 0,
+          "final_count": 1,
+          "passed": false,
+          "received_event_buffer": [
+            {
+              "received_at": "2026-07-19T15:10:41.725Z",
+              "payload": {
+                "schema": "public",
+                "table": "realtime_owner_probe",
+                "commit_timestamp": null,
+                "eventType": "INSERT",
+                "new": {},
+                "old": {},
+                "errors": [
+                  "Error 401: Unauthorized"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "unrelated": {
+        "channel_status": "SUBSCRIBED",
+        "statuses": [
+          {
+            "status": "SUBSCRIBED",
+            "error": null,
+            "at": "2026-07-19T15:10:43.476Z"
+          },
+          {
+            "status": "CLOSED",
+            "error": null,
+            "at": "2026-07-19T15:10:45.665Z"
+          },
+          {
+            "status": "CLOSED",
+            "error": null,
+            "at": "2026-07-19T15:10:45.665Z"
+          }
+        ],
+        "observation": {
+          "baseline_count": 0,
+          "final_count": 0,
+          "passed": true,
+          "received_event_buffer": []
+        }
+      }
+    }
+  ]
+}

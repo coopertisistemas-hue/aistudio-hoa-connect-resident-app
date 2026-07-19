@@ -4,6 +4,8 @@
 > Wave B: Denormalized Direct Ownership for `support_messages`  
 > Date: July 19, 2026
 
+Historical failed Option B rerun. The final diagnostic resolution and passing rerun are recorded in [16-realtime-authorization-diagnostic-report.md](16-realtime-authorization-diagnostic-report.md).
+
 ---
 
 ## 1. Why private Broadcast was rejected

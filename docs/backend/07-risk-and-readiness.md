@@ -6,7 +6,7 @@
 
 ## 1. Risk register
 
-**July 19, 2026 remediation update:** `notifications` remains validated, ADR-10 remains validated, ADR-11 remains validated, private Broadcast remains rejected, and the Option B `support_messages` runtime still delivered unauthorized envelopes instead of approved row payloads. Sprint 1 remains blocked by ADR-09 only. See [14-realtime-remediation-report.md](14-realtime-remediation-report.md) and [15-realtime-option-b-validation-report.md](15-realtime-option-b-validation-report.md).
+**July 19, 2026 final diagnostic update:** `notifications` remains validated, ADR-10 remains validated, ADR-11 remains validated, private Broadcast remains rejected, and the remaining Option B `support_messages` failure was traced to local validation-harness Realtime auth propagation on reused clients rather than to the RLS policy. The corrected runtime harness now passes RT-04 through RT-14 and DB-01 through DB-10 on the original Option B policy shape. See [16-realtime-authorization-diagnostic-report.md](16-realtime-authorization-diagnostic-report.md).
 
 Scoring: Probability × Impact, both 1–5. **Exposure ≥ 15 requires a named owner and a mitigation
 that lands before the dependent sprint opens.**
@@ -34,7 +34,7 @@ that lands before the dependent sprint opens.**
 | R-12 | Auth config not production-ready — localhost `site_url`, no SMTP, empty redirect list (MEDIUM-05) | 4 | 3 | 12 | Sprint 0 item 0.5 |
 | R-13 | Open signup + zero-member self-join = latent privilege path (MEDIUM-03/04) | 3 | 4 | 12 | Sprint 0 items 0.4, 0.5 |
 | R-14 | PII over-exposure to residents — co-resident data, `association-api GET /members` (MEDIUM-01) | 3 | 4 | 12 | Minimal co-resident projection (Doc 03 §3.3); `residents-api`/`association-api /members` never resident-reachable |
-| R-15 | Realtime subscription leaks data across profiles | 4 | 5 | 20 | July 19, 2026 validation proved `support_messages` still emits unauthorized envelopes under both the original join-based model and the Option B direct-ownership model; ADR-09 remains blocking until foreign activity is silent and authorized payload delivery works |
+| R-15 | Realtime subscription leaks data across profiles | 2 | 5 | 10 | July 19, 2026 diagnostic wave proved the remaining `support_messages` failure came from local harness token propagation on reused Realtime clients, not from the validated Option B policy. Corrected harness rerun delivered authorized rows and foreign silence. Residual risk is production drift from the validated local sequence, not an open architecture blocker |
 | R-16 | Storage path traversal / cross-tenant write | 2 | 5 | 10 | Server constructs every path; client never supplies one (Doc 05 §1.3) |
 | R-17 | Line items don't sum to invoice total | 3 | 4 | 12 | Deferred constraint trigger; a resident seeing inconsistent totals destroys trust |
 | R-18 | Edge Function cold starts miss the 200 ms p95 target | 3 | 3 | 9 | 9 grouped functions rather than 60; aggregate endpoints; measured in Sprint 8 |

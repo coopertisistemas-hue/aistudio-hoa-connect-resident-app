@@ -2,9 +2,11 @@
 
 ## Status
 
-**Notifications retained. `support_messages` remains blocked after Option B runtime revalidation on July 19, 2026.**
+**Notifications retained. `support_messages` validated on July 19, 2026 after the ADR-09 diagnostic wave isolated a local Realtime auth-propagation harness defect.**
 
 ADR-10 and ADR-11 remain validated and unchanged.
+
+Final diagnostic close-out: [16-realtime-authorization-diagnostic-report.md](16-realtime-authorization-diagnostic-report.md).
 
 ---
 

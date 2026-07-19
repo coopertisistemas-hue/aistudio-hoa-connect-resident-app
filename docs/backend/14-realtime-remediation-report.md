@@ -4,6 +4,8 @@
 > Realtime Remediation Wave B for `support_messages`
 > Date: July 19, 2026
 
+Historical failed remediation wave. The final diagnostic resolution is recorded in [16-realtime-authorization-diagnostic-report.md](16-realtime-authorization-diagnostic-report.md).
+
 ---
 
 ## 1. Failure recap

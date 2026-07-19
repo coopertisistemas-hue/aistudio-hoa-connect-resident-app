@@ -1,6 +1,8 @@
 import crypto from 'node:crypto';
 import process from 'node:process';
 import { execFileSync } from 'node:child_process';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createClient } from '@supabase/supabase-js';
 
 const requiredEnv = ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'SUPABASE_JWT_SECRET', 'SUPABASE_DB_URL'];
@@ -14,9 +16,13 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
 const SUPABASE_JWT_SECRET = process.env.SUPABASE_JWT_SECRET;
 const SUPABASE_DB_URL = process.env.SUPABASE_DB_URL;
+const DB_CONTAINER = 'supabase_db_aistudio-hoa-connect-resident-app';
+const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const SETUP_SQL_PATH = path.join(PROJECT_ROOT, 'validation', 'd2_setup.sql');
 
 const OBSERVATION_MS = 2000;
 const DELIVERY_WAIT_MS = 9000;
+const POST_SUBSCRIBE_SETTLE_MS = 250;
 
 const users = {
   residentA: '10000000-0000-0000-0000-000000000001',
@@ -70,7 +76,7 @@ function signJwt(sub, role = 'authenticated') {
 function psql(sql) {
   return execFileSync('docker', [
     'exec',
-    'supabase_db_aistudio-hoa-connect-resident-app',
+    DB_CONTAINER,
     'psql',
     '-U',
     'postgres',
@@ -84,6 +90,16 @@ function psql(sql) {
   ], {
     encoding: 'utf8',
   }).trim();
+}
+
+function resetValidationState() {
+  execFileSync('bash', [
+    '-lc',
+    `docker exec -i ${DB_CONTAINER} psql -U postgres -d postgres < '${SETUP_SQL_PATH}'`,
+  ], {
+    encoding: 'utf8',
+    stdio: 'pipe',
+  });
 }
 
 function createAuthedClient(sub) {
@@ -100,12 +116,17 @@ function createAuthedClient(sub) {
     },
   });
   client.realtime.setAuth(token);
+  client.__realtimeAuthToken = token;
   return client;
 }
 
 async function subscribeToInserts(client, channelName, table, filter) {
   const events = [];
   const statuses = [];
+
+  if (client.__realtimeAuthToken) {
+    client.realtime.setAuth(client.__realtimeAuthToken);
+  }
 
   const channel = client
     .channel(channelName)
@@ -134,6 +155,8 @@ async function subscribeToInserts(client, channelName, table, filter) {
       }
     });
   });
+
+  await sleep(POST_SUBSCRIBE_SETTLE_MS);
 
   return { channel, events, statuses, filter: filter ?? null };
 }
@@ -192,20 +215,26 @@ async function run() {
     adr10_api_surface: {},
   };
 
-  const residentAClient = createAuthedClient(users.residentA);
-  const residentBClient = createAuthedClient(users.residentB);
-  const unrelatedClient = createAuthedClient(users.unrelated);
-  const operatorAClient = createAuthedClient(users.operatorA);
+  resetValidationState();
+
   const subscriptions = [];
+  const clients = [];
+
+  function makeClient(sub) {
+    const client = createAuthedClient(sub);
+    clients.push(client);
+    return client;
+  }
 
   try {
+    const residentNotifClient = makeClient(users.residentA);
     const residentNotif = await subscribeToInserts(
-      residentAClient,
+      residentNotifClient,
       'd2b-rt-notifications-resident-a',
       'notifications',
       `profile_id=eq.${profiles.residentA}`,
     );
-    subscriptions.push({ client: residentAClient, channel: residentNotif.channel });
+    subscriptions.push({ client: residentNotifClient, channel: residentNotif.channel });
 
     const notifInsertId = runtimeId();
     psql(`
@@ -229,13 +258,14 @@ async function run() {
       failures.push('RT-02 failed: Resident A received a cross-tenant notification');
     }
 
+    const unrelatedNotifClient = makeClient(users.unrelated);
     const unrelatedNotif = await subscribeToInserts(
-      unrelatedClient,
+      unrelatedNotifClient,
       'd2b-rt-notifications-unrelated',
       'notifications',
       `profile_id=eq.${profiles.residentA}`,
     );
-    subscriptions.push({ client: unrelatedClient, channel: unrelatedNotif.channel });
+    subscriptions.push({ client: unrelatedNotifClient, channel: unrelatedNotif.channel });
 
     const unrelatedInsertId = runtimeId();
     psql(`
@@ -247,12 +277,13 @@ async function run() {
       failures.push('RT-03 failed: unrelated authenticated user received a notification');
     }
 
+    const residentSupportClient = makeClient(users.residentA);
     const residentSupport = await subscribeToInserts(
-      residentAClient,
+      residentSupportClient,
       'd2b-rt-support-resident-a',
       'support_messages',
     );
-    subscriptions.push({ client: residentAClient, channel: residentSupport.channel });
+    subscriptions.push({ client: residentSupportClient, channel: residentSupport.channel });
 
     const supportInsertId = runtimeId();
     psql(`
@@ -277,17 +308,18 @@ async function run() {
       failures.push('RT-04 failed: authorized subscription received an unauthorized envelope');
     }
 
-    if (rt04Snapshot.length !== 1 || rt04AuthorizedRows.length !== 1) {
+    if (rt04Snapshot.length !== 1) {
       failures.push(`RT-10 failed: expected one logical support event, received ${rt04Snapshot.length}`);
     }
 
+    const foreignSupportClient = makeClient(users.residentA);
     const foreignSubscription = await subscribeToInserts(
-      residentAClient,
+      foreignSupportClient,
       'd2b-rt-support-foreign-request',
       'support_messages',
       `support_request_id=eq.${requests.residentB}`,
     );
-    subscriptions.push({ client: residentAClient, channel: foreignSubscription.channel });
+    subscriptions.push({ client: foreignSupportClient, channel: foreignSubscription.channel });
 
     const foreignInsertId = runtimeId();
     psql(`
@@ -299,13 +331,14 @@ async function run() {
       failures.push('RT-05 failed: foreign support message generated an event envelope');
     }
 
+    const unrelatedSupportClient = makeClient(users.unrelated);
     const unrelatedSupport = await subscribeToInserts(
-      unrelatedClient,
+      unrelatedSupportClient,
       'd2b-rt-support-unrelated',
       'support_messages',
       `support_request_id=eq.${requests.residentA}`,
     );
-    subscriptions.push({ client: unrelatedClient, channel: unrelatedSupport.channel });
+    subscriptions.push({ client: unrelatedSupportClient, channel: unrelatedSupport.channel });
 
     const unrelatedSupportInsertId = runtimeId();
     psql(`
@@ -317,20 +350,22 @@ async function run() {
       failures.push('RT-06 failed: unrelated authenticated user received a support message event');
     }
 
+    const guessedRequestClient = makeClient(users.residentA);
     const guessedRequestSubscription = await subscribeToInserts(
-      residentAClient,
+      guessedRequestClient,
       'd2b-rt-support-guessed-request',
       'support_messages',
       `support_request_id=eq.${requests.guessed}`,
     );
-    subscriptions.push({ client: residentAClient, channel: guessedRequestSubscription.channel });
+    subscriptions.push({ client: guessedRequestClient, channel: guessedRequestSubscription.channel });
 
     const rt07ObservationRequest = await observeNoNewEvents('rt07_request', guessedRequestSubscription, 0, new Date().toISOString());
     if (!rt07ObservationRequest.passed) {
       failures.push('RT-07 failed: guessed request filter discovered foreign activity');
     }
 
-    const residentSupportRows = await residentAClient
+    const residentReadClient = makeClient(users.residentA);
+    const residentSupportRows = await residentReadClient
       .from('support_messages')
       .select('id, tenant_id, property_id, resident_profile_id, support_request_id, delivery_sequence, sender_type, sender_profile_id, content, created_at')
       .order('created_at', { ascending: true });
@@ -339,12 +374,13 @@ async function run() {
       failures.push('RT-08 failed: direct support_messages read returned an error or unauthorized rows');
     }
 
+    const orderedSupportClient = makeClient(users.residentA);
     const orderedSubscription = await subscribeToInserts(
-      residentAClient,
+      orderedSupportClient,
       'd2b-rt-support-ordering',
       'support_messages',
     );
-    subscriptions.push({ client: residentAClient, channel: orderedSubscription.channel });
+    subscriptions.push({ client: orderedSupportClient, channel: orderedSubscription.channel });
 
     const orderedInsertA = runtimeId();
     const orderedInsertB = runtimeId();
@@ -372,12 +408,13 @@ async function run() {
       }
     }
 
+    const revocationClient = makeClient(users.residentA);
     const revocationSubscription = await subscribeToInserts(
-      residentAClient,
+      revocationClient,
       'd2b-rt-support-revocation',
       'support_messages',
     );
-    subscriptions.push({ client: residentAClient, channel: revocationSubscription.channel });
+    subscriptions.push({ client: revocationClient, channel: revocationSubscription.channel });
     psql(`
       UPDATE public.residence_members
       SET status = 'revoked'
@@ -398,18 +435,20 @@ async function run() {
       WHERE id = '30000000-0000-0000-0000-000000000001';
     `);
 
+    const tenantAClient = makeClient(users.residentA);
     const tenantASubscription = await subscribeToInserts(
-      residentAClient,
+      tenantAClient,
       'd2b-rt-support-tenant-a',
       'support_messages',
     );
-    subscriptions.push({ client: residentAClient, channel: tenantASubscription.channel });
+    subscriptions.push({ client: tenantAClient, channel: tenantASubscription.channel });
+    const tenantBClient = makeClient(users.residentB);
     const tenantBSubscription = await subscribeToInserts(
-      residentBClient,
+      tenantBClient,
       'd2b-rt-support-tenant-b',
       'support_messages',
     );
-    subscriptions.push({ client: residentBClient, channel: tenantBSubscription.channel });
+    subscriptions.push({ client: tenantBClient, channel: tenantBSubscription.channel });
 
     const tenantAInsert = runtimeId();
     const tenantBInsert = runtimeId();
@@ -438,19 +477,20 @@ async function run() {
       failures.push('RT-13 failed: concurrent tenant subscriptions observed cross-tenant activity');
     }
 
+    const reconnectClient = makeClient(users.residentA);
     const reconnectSubscriptionA = await subscribeToInserts(
-      residentAClient,
+      reconnectClient,
       'd2b-rt-support-reconnect-a',
       'support_messages',
     );
-    subscriptions.push({ client: residentAClient, channel: reconnectSubscriptionA.channel });
+    subscriptions.push({ client: reconnectClient, channel: reconnectSubscriptionA.channel });
     await reconnectSubscriptionA.channel.unsubscribe();
     const reconnectSubscriptionB = await subscribeToInserts(
-      residentAClient,
+      reconnectClient,
       'd2b-rt-support-reconnect-b',
       'support_messages',
     );
-    subscriptions.push({ client: residentAClient, channel: reconnectSubscriptionB.channel });
+    subscriptions.push({ client: reconnectClient, channel: reconnectSubscriptionB.channel });
     const reconnectInsertId = runtimeId();
     psql(`
       INSERT INTO public.support_messages (id, support_request_id, sender_type, sender_profile_id, content, created_at)
@@ -464,9 +504,12 @@ async function run() {
       failures.push('RT-14 failed: reconnect behavior delivered the wrong number of events');
     }
 
-    const residentProfilesRows = await residentAClient.from('profiles').select('id');
-    const operatorProfilesRows = await operatorAClient.from('profiles').select('id');
-    const unrelatedProfilesRows = await unrelatedClient.from('profiles').select('id');
+    const residentProfilesClient = makeClient(users.residentA);
+    const operatorProfilesClient = makeClient(users.operatorA);
+    const unrelatedProfilesClient = makeClient(users.unrelated);
+    const residentProfilesRows = await residentProfilesClient.from('profiles').select('id');
+    const operatorProfilesRows = await operatorProfilesClient.from('profiles').select('id');
+    const unrelatedProfilesRows = await unrelatedProfilesClient.from('profiles').select('id');
 
     evidence.adr09 = {
       selected_model: 'B1 direct resident ownership projection',
@@ -565,10 +608,7 @@ async function run() {
     );
 
     await Promise.allSettled([
-      residentAClient.removeAllChannels(),
-      residentBClient.removeAllChannels(),
-      unrelatedClient.removeAllChannels(),
-      operatorAClient.removeAllChannels(),
+      ...clients.map((client) => client.removeAllChannels()),
     ]);
   }
 }

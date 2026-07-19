@@ -1,7 +1,7 @@
 # 13 — D2 Validation Report
 
 > Backend Integration Program — D2 Validation Gate Wave  
-> Updated on July 19, 2026 after Option B revalidation
+> Historical failed wave. Superseded on July 19, 2026 by [16-realtime-authorization-diagnostic-report.md](16-realtime-authorization-diagnostic-report.md).
 
 ---
 

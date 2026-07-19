@@ -1,0 +1,1773 @@
+{
+  "generated_at": "2026-07-19T15:11:19.483Z",
+  "environment": {
+    "type": "local-supabase-cli",
+    "api_url": "http://127.0.0.1:54331",
+    "db_container": "supabase_db_aistudio-hoa-connect-resident-app",
+    "realtime_container": "supabase_realtime_aistudio-hoa-connect-resident-app"
+  },
+  "auth_trace": {
+    "session_creation_method": "synthetic local JWT signed with SUPABASE_JWT_SECRET after local schema reset; no GoTrue sign-in flow used in the validation harness",
+    "auth_user_probe": [],
+    "resident_a": {
+      "expected_user_id": "10000000-0000-0000-0000-000000000001",
+      "token_fingerprint": "6ff800550be3a7d9",
+      "header_fields": [
+        "alg",
+        "typ"
+      ],
+      "claim_names": [
+        "aud",
+        "exp",
+        "iat",
+        "iss",
+        "role",
+        "sub"
+      ],
+      "sub": "10000000-0000-0000-0000-000000000001",
+      "role": "authenticated",
+      "aud": "authenticated",
+      "exp": 1784475592,
+      "iss": "supabase-demo"
+    },
+    "database_identity_probe": {
+      "status": 200,
+      "error": null,
+      "observed": {
+        "jwt_aud": null,
+        "jwt_exp": null,
+        "jwt_iss": null,
+        "jwt_sub": null,
+        "auth_uid": "10000000-0000-0000-0000-000000000001",
+        "jwt_role": null,
+        "auth_role": "authenticated",
+        "current_user": "authenticated",
+        "current_profile_id": "20000000-0000-0000-0000-000000000001",
+        "current_tenant_ids": [
+          "11111111-1111-1111-1111-111111111111"
+        ]
+      }
+    },
+    "support_row_sample": {
+      "id": "80000000-0000-0000-0000-000000000001",
+      "tenant_id": "11111111-1111-1111-1111-111111111111",
+      "resident_profile_id": "20000000-0000-0000-0000-000000000001",
+      "resident_user_id": "10000000-0000-0000-0000-000000000001",
+      "resident_access_revoked": false,
+      "support_request_id": "70000000-0000-0000-0000-000000000001"
+    },
+    "postgrest_direct_read": {
+      "status": 200,
+      "error": null,
+      "row_ids": [
+        "80000000-0000-0000-0000-000000000001"
+      ]
+    }
+  },
+  "metadata": {
+    "publication_membership": [
+      {
+        "schemaname": "public",
+        "tablename": "notifications"
+      },
+      {
+        "schemaname": "public",
+        "tablename": "realtime_owner_probe"
+      },
+      {
+        "schemaname": "public",
+        "tablename": "support_messages"
+      }
+    ],
+    "replica_identity": [
+      {
+        "table_name": "notifications",
+        "relreplident": "d"
+      },
+      {
+        "table_name": "realtime_owner_probe",
+        "relreplident": "d"
+      },
+      {
+        "table_name": "support_messages",
+        "relreplident": "d"
+      }
+    ],
+    "rls_and_force": [
+      {
+        "table_name": "notifications",
+        "relrowsecurity": true,
+        "relforcerowsecurity": true
+      },
+      {
+        "table_name": "realtime_owner_probe",
+        "relrowsecurity": true,
+        "relforcerowsecurity": true
+      },
+      {
+        "table_name": "support_messages",
+        "relrowsecurity": true,
+        "relforcerowsecurity": true
+      }
+    ],
+    "grants": [
+      {
+        "table_name": "notifications",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "support_messages",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      }
+    ],
+    "policy_summary": [
+      {
+        "tablename": "notifications",
+        "policyname": "notifications_select_self_policy",
+        "roles": [
+          "public"
+        ],
+        "qual": "(profile_id = current_profile_id())"
+      },
+      {
+        "tablename": "notifications",
+        "policyname": "notifications_update_self_policy",
+        "roles": [
+          "public"
+        ],
+        "qual": "(profile_id = current_profile_id())"
+      },
+      {
+        "tablename": "realtime_owner_probe",
+        "policyname": "realtime_owner_probe_select_policy",
+        "roles": [
+          "public"
+        ],
+        "qual": "(owner_user_id = auth.uid())"
+      },
+      {
+        "tablename": "support_messages",
+        "policyname": "support_messages_select_operator_policy",
+        "roles": [
+          "authenticated"
+        ],
+        "qual": "is_authorized_operator(tenant_id)"
+      },
+      {
+        "tablename": "support_messages",
+        "policyname": "support_messages_select_platform_admin_policy",
+        "roles": [
+          "authenticated"
+        ],
+        "qual": "is_platform_admin()"
+      },
+      {
+        "tablename": "support_messages",
+        "policyname": "support_messages_select_resident_policy",
+        "roles": [
+          "authenticated"
+        ],
+        "qual": "((resident_user_id = auth.uid()) AND (resident_access_revoked = false))"
+      }
+    ]
+  },
+  "notifications_comparison": {
+    "primary_keys": [
+      {
+        "table_name": "notifications",
+        "column_name": "id"
+      },
+      {
+        "table_name": "support_messages",
+        "column_name": "id"
+      }
+    ],
+    "columns": [
+      {
+        "table_name": "notifications",
+        "column_name": "id",
+        "data_type": "uuid",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "table_name": "notifications",
+        "column_name": "tenant_id",
+        "data_type": "uuid",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "table_name": "notifications",
+        "column_name": "profile_id",
+        "data_type": "uuid",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "table_name": "notifications",
+        "column_name": "category",
+        "data_type": "text",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "table_name": "notifications",
+        "column_name": "title_key",
+        "data_type": "text",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "table_name": "notifications",
+        "column_name": "body_key",
+        "data_type": "text",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "table_name": "notifications",
+        "column_name": "params",
+        "data_type": "jsonb",
+        "is_nullable": "NO",
+        "column_default": "'{}'::jsonb"
+      },
+      {
+        "table_name": "notifications",
+        "column_name": "read_at",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "table_name": "notifications",
+        "column_name": "created_at",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": "now()"
+      },
+      {
+        "table_name": "support_messages",
+        "column_name": "id",
+        "data_type": "uuid",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "table_name": "support_messages",
+        "column_name": "tenant_id",
+        "data_type": "uuid",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "table_name": "support_messages",
+        "column_name": "property_id",
+        "data_type": "uuid",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "table_name": "support_messages",
+        "column_name": "resident_profile_id",
+        "data_type": "uuid",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "table_name": "support_messages",
+        "column_name": "resident_user_id",
+        "data_type": "uuid",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "table_name": "support_messages",
+        "column_name": "resident_access_revoked",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "table_name": "support_messages",
+        "column_name": "support_request_id",
+        "data_type": "uuid",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "table_name": "support_messages",
+        "column_name": "delivery_sequence",
+        "data_type": "bigint",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "table_name": "support_messages",
+        "column_name": "sender_type",
+        "data_type": "text",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "table_name": "support_messages",
+        "column_name": "sender_profile_id",
+        "data_type": "uuid",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "table_name": "support_messages",
+        "column_name": "content",
+        "data_type": "text",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "table_name": "support_messages",
+        "column_name": "created_at",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": "now()"
+      }
+    ],
+    "foreign_keys": [
+      {
+        "table_name": "notifications",
+        "conname": "notifications_profile_id_fkey",
+        "definition": "FOREIGN KEY (profile_id) REFERENCES profiles(id)"
+      },
+      {
+        "table_name": "notifications",
+        "conname": "notifications_tenant_id_fkey",
+        "definition": "FOREIGN KEY (tenant_id) REFERENCES tenants(id)"
+      },
+      {
+        "table_name": "support_messages",
+        "conname": "support_messages_identity_projection_fk",
+        "definition": "FOREIGN KEY (support_request_id, tenant_id, property_id, resident_profile_id) REFERENCES support_requests(id, tenant_id, property_id, profile_id)"
+      },
+      {
+        "table_name": "support_messages",
+        "conname": "support_messages_property_id_fkey",
+        "definition": "FOREIGN KEY (property_id) REFERENCES properties(id)"
+      },
+      {
+        "table_name": "support_messages",
+        "conname": "support_messages_request_fk",
+        "definition": "FOREIGN KEY (support_request_id) REFERENCES support_requests(id)"
+      },
+      {
+        "table_name": "support_messages",
+        "conname": "support_messages_resident_profile_id_fkey",
+        "definition": "FOREIGN KEY (resident_profile_id) REFERENCES profiles(id)"
+      },
+      {
+        "table_name": "support_messages",
+        "conname": "support_messages_sender_profile_id_fkey",
+        "definition": "FOREIGN KEY (sender_profile_id) REFERENCES profiles(id)"
+      },
+      {
+        "table_name": "support_messages",
+        "conname": "support_messages_tenant_id_fkey",
+        "definition": "FOREIGN KEY (tenant_id) REFERENCES tenants(id)"
+      }
+    ],
+    "triggers": [
+      {
+        "table_name": "support_messages",
+        "trigger_name": "derive_support_message_ownership_before_insert",
+        "action_timing": "BEFORE",
+        "event_manipulation": "INSERT"
+      },
+      {
+        "table_name": "support_messages",
+        "trigger_name": "enforce_support_message_immutability_before_update",
+        "action_timing": "BEFORE",
+        "event_manipulation": "UPDATE"
+      }
+    ]
+  },
+  "filter_matrix": [
+    {
+      "name": "none",
+      "filter": null,
+      "channel_status": "SUBSCRIBED",
+      "statuses": [
+        {
+          "status": "SUBSCRIBED",
+          "error": null,
+          "at": "2026-07-19T15:10:45.914Z"
+        },
+        {
+          "status": "CLOSED",
+          "error": null,
+          "at": "2026-07-19T15:10:46.464Z"
+        },
+        {
+          "status": "CLOSED",
+          "error": null,
+          "at": "2026-07-19T15:10:46.464Z"
+        }
+      ],
+      "authorized_rows": [
+        {
+          "id": "a874ac97-f478-46dd-a396-ce2f4257b018",
+          "content": "filter none",
+          "tenant_id": "11111111-1111-1111-1111-111111111111",
+          "created_at": "2026-07-19T15:10:46.164+00:00",
+          "property_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "sender_type": "association",
+          "resident_user_id": "10000000-0000-0000-0000-000000000001",
+          "delivery_sequence": 26,
+          "sender_profile_id": null,
+          "support_request_id": "70000000-0000-0000-0000-000000000001",
+          "resident_profile_id": "20000000-0000-0000-0000-000000000001",
+          "resident_access_revoked": false
+        }
+      ],
+      "unauthorized_envelopes": [],
+      "raw_events": [
+        {
+          "received_at": "2026-07-19T15:10:46.434Z",
+          "payload": {
+            "schema": "public",
+            "table": "support_messages",
+            "commit_timestamp": "2026-07-19T15:10:46.256Z",
+            "eventType": "INSERT",
+            "new": {
+              "id": "a874ac97-f478-46dd-a396-ce2f4257b018",
+              "content": "filter none",
+              "tenant_id": "11111111-1111-1111-1111-111111111111",
+              "created_at": "2026-07-19T15:10:46.164+00:00",
+              "property_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+              "sender_type": "association",
+              "resident_user_id": "10000000-0000-0000-0000-000000000001",
+              "delivery_sequence": 26,
+              "sender_profile_id": null,
+              "support_request_id": "70000000-0000-0000-0000-000000000001",
+              "resident_profile_id": "20000000-0000-0000-0000-000000000001",
+              "resident_access_revoked": false
+            },
+            "old": {},
+            "errors": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "support_request_id",
+      "filter": "support_request_id=eq.70000000-0000-0000-0000-000000000001",
+      "channel_status": "SUBSCRIBED",
+      "statuses": [
+        {
+          "status": "SUBSCRIBED",
+          "error": null,
+          "at": "2026-07-19T15:10:46.474Z"
+        },
+        {
+          "status": "CLOSED",
+          "error": null,
+          "at": "2026-07-19T15:10:47.049Z"
+        },
+        {
+          "status": "CLOSED",
+          "error": null,
+          "at": "2026-07-19T15:10:47.050Z"
+        }
+      ],
+      "authorized_rows": [
+        {
+          "id": "1a73b086-8781-4daa-b6ff-0501f57e1304",
+          "content": "filter support_request_id",
+          "tenant_id": "11111111-1111-1111-1111-111111111111",
+          "created_at": "2026-07-19T15:10:46.724+00:00",
+          "property_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "sender_type": "association",
+          "resident_user_id": "10000000-0000-0000-0000-000000000001",
+          "delivery_sequence": 27,
+          "sender_profile_id": null,
+          "support_request_id": "70000000-0000-0000-0000-000000000001",
+          "resident_profile_id": "20000000-0000-0000-0000-000000000001",
+          "resident_access_revoked": false
+        }
+      ],
+      "unauthorized_envelopes": [],
+      "raw_events": [
+        {
+          "received_at": "2026-07-19T15:10:46.978Z",
+          "payload": {
+            "schema": "public",
+            "table": "support_messages",
+            "commit_timestamp": "2026-07-19T15:10:46.837Z",
+            "eventType": "INSERT",
+            "new": {
+              "id": "1a73b086-8781-4daa-b6ff-0501f57e1304",
+              "content": "filter support_request_id",
+              "tenant_id": "11111111-1111-1111-1111-111111111111",
+              "created_at": "2026-07-19T15:10:46.724+00:00",
+              "property_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+              "sender_type": "association",
+              "resident_user_id": "10000000-0000-0000-0000-000000000001",
+              "delivery_sequence": 27,
+              "sender_profile_id": null,
+              "support_request_id": "70000000-0000-0000-0000-000000000001",
+              "resident_profile_id": "20000000-0000-0000-0000-000000000001",
+              "resident_access_revoked": false
+            },
+            "old": {},
+            "errors": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "resident_user_id",
+      "filter": "resident_user_id=eq.10000000-0000-0000-0000-000000000001",
+      "channel_status": "SUBSCRIBED",
+      "statuses": [
+        {
+          "status": "SUBSCRIBED",
+          "error": null,
+          "at": "2026-07-19T15:10:47.062Z"
+        },
+        {
+          "status": "CLOSED",
+          "error": null,
+          "at": "2026-07-19T15:10:47.510Z"
+        },
+        {
+          "status": "CLOSED",
+          "error": null,
+          "at": "2026-07-19T15:10:47.510Z"
+        }
+      ],
+      "authorized_rows": [
+        {
+          "id": "a1b9d2f2-dc77-49c0-a29f-8317541a19d2",
+          "content": "filter resident_user_id",
+          "tenant_id": "11111111-1111-1111-1111-111111111111",
+          "created_at": "2026-07-19T15:10:47.313+00:00",
+          "property_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "sender_type": "association",
+          "resident_user_id": "10000000-0000-0000-0000-000000000001",
+          "delivery_sequence": 28,
+          "sender_profile_id": null,
+          "support_request_id": "70000000-0000-0000-0000-000000000001",
+          "resident_profile_id": "20000000-0000-0000-0000-000000000001",
+          "resident_access_revoked": false
+        }
+      ],
+      "unauthorized_envelopes": [],
+      "raw_events": [
+        {
+          "received_at": "2026-07-19T15:10:47.506Z",
+          "payload": {
+            "schema": "public",
+            "table": "support_messages",
+            "commit_timestamp": "2026-07-19T15:10:47.399Z",
+            "eventType": "INSERT",
+            "new": {
+              "id": "a1b9d2f2-dc77-49c0-a29f-8317541a19d2",
+              "content": "filter resident_user_id",
+              "tenant_id": "11111111-1111-1111-1111-111111111111",
+              "created_at": "2026-07-19T15:10:47.313+00:00",
+              "property_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+              "sender_type": "association",
+              "resident_user_id": "10000000-0000-0000-0000-000000000001",
+              "delivery_sequence": 28,
+              "sender_profile_id": null,
+              "support_request_id": "70000000-0000-0000-0000-000000000001",
+              "resident_profile_id": "20000000-0000-0000-0000-000000000001",
+              "resident_access_revoked": false
+            },
+            "old": {},
+            "errors": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "tenant_id",
+      "filter": "tenant_id=eq.11111111-1111-1111-1111-111111111111",
+      "channel_status": "SUBSCRIBED",
+      "statuses": [
+        {
+          "status": "SUBSCRIBED",
+          "error": null,
+          "at": "2026-07-19T15:10:47.537Z"
+        },
+        {
+          "status": "CLOSED",
+          "error": null,
+          "at": "2026-07-19T15:10:48.175Z"
+        },
+        {
+          "status": "CLOSED",
+          "error": null,
+          "at": "2026-07-19T15:10:48.175Z"
+        }
+      ],
+      "authorized_rows": [
+        {
+          "id": "3b2cf481-bf83-4525-bf9c-a594525b9b0f",
+          "content": "filter tenant_id",
+          "tenant_id": "11111111-1111-1111-1111-111111111111",
+          "created_at": "2026-07-19T15:10:47.788+00:00",
+          "property_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "sender_type": "association",
+          "resident_user_id": "10000000-0000-0000-0000-000000000001",
+          "delivery_sequence": 29,
+          "sender_profile_id": null,
+          "support_request_id": "70000000-0000-0000-0000-000000000001",
+          "resident_profile_id": "20000000-0000-0000-0000-000000000001",
+          "resident_access_revoked": false
+        }
+      ],
+      "unauthorized_envelopes": [],
+      "raw_events": [
+        {
+          "received_at": "2026-07-19T15:10:48.153Z",
+          "payload": {
+            "schema": "public",
+            "table": "support_messages",
+            "commit_timestamp": "2026-07-19T15:10:47.921Z",
+            "eventType": "INSERT",
+            "new": {
+              "id": "3b2cf481-bf83-4525-bf9c-a594525b9b0f",
+              "content": "filter tenant_id",
+              "tenant_id": "11111111-1111-1111-1111-111111111111",
+              "created_at": "2026-07-19T15:10:47.788+00:00",
+              "property_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+              "sender_type": "association",
+              "resident_user_id": "10000000-0000-0000-0000-000000000001",
+              "delivery_sequence": 29,
+              "sender_profile_id": null,
+              "support_request_id": "70000000-0000-0000-0000-000000000001",
+              "resident_profile_id": "20000000-0000-0000-0000-000000000001",
+              "resident_access_revoked": false
+            },
+            "old": {},
+            "errors": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "current_intended",
+      "filter": "support_request_id=eq.70000000-0000-0000-0000-000000000001",
+      "channel_status": "SUBSCRIBED",
+      "statuses": [
+        {
+          "status": "SUBSCRIBED",
+          "error": null,
+          "at": "2026-07-19T15:10:48.250Z"
+        },
+        {
+          "status": "CLOSED",
+          "error": null,
+          "at": "2026-07-19T15:10:48.749Z"
+        },
+        {
+          "status": "CLOSED",
+          "error": null,
+          "at": "2026-07-19T15:10:48.749Z"
+        }
+      ],
+      "authorized_rows": [
+        {
+          "id": "1014f2ce-95b4-478b-8174-3ce54828663a",
+          "content": "filter current_intended",
+          "tenant_id": "11111111-1111-1111-1111-111111111111",
+          "created_at": "2026-07-19T15:10:48.501+00:00",
+          "property_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "sender_type": "association",
+          "resident_user_id": "10000000-0000-0000-0000-000000000001",
+          "delivery_sequence": 30,
+          "sender_profile_id": null,
+          "support_request_id": "70000000-0000-0000-0000-000000000001",
+          "resident_profile_id": "20000000-0000-0000-0000-000000000001",
+          "resident_access_revoked": false
+        }
+      ],
+      "unauthorized_envelopes": [],
+      "raw_events": [
+        {
+          "received_at": "2026-07-19T15:10:48.693Z",
+          "payload": {
+            "schema": "public",
+            "table": "support_messages",
+            "commit_timestamp": "2026-07-19T15:10:48.633Z",
+            "eventType": "INSERT",
+            "new": {
+              "id": "1014f2ce-95b4-478b-8174-3ce54828663a",
+              "content": "filter current_intended",
+              "tenant_id": "11111111-1111-1111-1111-111111111111",
+              "created_at": "2026-07-19T15:10:48.501+00:00",
+              "property_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+              "sender_type": "association",
+              "resident_user_id": "10000000-0000-0000-0000-000000000001",
+              "delivery_sequence": 30,
+              "sender_profile_id": null,
+              "support_request_id": "70000000-0000-0000-0000-000000000001",
+              "resident_profile_id": "20000000-0000-0000-0000-000000000001",
+              "resident_access_revoked": false
+            },
+            "old": {},
+            "errors": null
+          }
+        }
+      ]
+    }
+  ],
+  "root_cause": {
+    "layer": "Realtime token propagation and client/session reuse in the local validation harness",
+    "summary": [
+      "Authenticated PostgREST reads and the RPC identity probe saw Resident A as expected.",
+      "Fresh-client policy bisect runs passed for the direct ownership predicates, including the original TO authenticated resident policy.",
+      "The earlier RT-04 failure reproduced only in the long-lived runtime probe that reused clients and channels across notifications and multiple support scenarios.",
+      "Reapplying the current access token before each channel subscribe and isolating support scenarios onto fresh authenticated clients eliminated the unauthorized envelopes while keeping the original Option B policy shape intact."
+    ],
+    "proof_points": {
+      "p1_authenticated_true": {
+        "id": "P1_authenticated_true",
+        "description": "USING (true) with TO authenticated",
+        "policy": {
+          "scope": "authenticated",
+          "expression": "true"
+        },
+        "replica_identity": "DEFAULT",
+        "filter": null,
+        "rt04": {
+          "statuses": [
+            {
+              "status": "SUBSCRIBED",
+              "error": null,
+              "at": "2026-07-19T15:09:52.830Z"
+            },
+            {
+              "status": "CLOSED",
+              "error": null,
+              "at": "2026-07-19T15:09:57.886Z"
+            },
+            {
+              "status": "CLOSED",
+              "error": null,
+              "at": "2026-07-19T15:09:57.887Z"
+            }
+          ],
+          "channel_status": "SUBSCRIBED",
+          "events": [
+            {
+              "received_at": "2026-07-19T15:09:53.471Z",
+              "payload": {
+                "schema": "public",
+                "table": "support_messages",
+                "commit_timestamp": "2026-07-19T15:09:53.181Z",
+                "eventType": "INSERT",
+                "new": {
+                  "id": "6f8afb2d-bce7-4997-87e3-614c9dc91c3c",
+                  "content": "P1_authenticated_true authorized message",
+                  "tenant_id": "11111111-1111-1111-1111-111111111111",
+                  "created_at": "2026-07-19T15:09:53.08+00:00",
+                  "property_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+                  "sender_type": "association",
+                  "resident_user_id": "10000000-0000-0000-0000-000000000001",
+                  "delivery_sequence": 2,
+                  "sender_profile_id": null,
+                  "support_request_id": "70000000-0000-0000-0000-000000000001",
+                  "resident_profile_id": "20000000-0000-0000-0000-000000000001",
+                  "resident_access_revoked": false
+                },
+                "old": {},
+                "errors": null
+              }
+            },
+            {
+              "received_at": "2026-07-19T15:09:53.995Z",
+              "payload": {
+                "schema": "public",
+                "table": "support_messages",
+                "commit_timestamp": "2026-07-19T15:09:53.843Z",
+                "eventType": "INSERT",
+                "new": {
+                  "id": "e80a0fc7-867e-43e8-8735-ebfe30475d54",
+                  "content": "P1_authenticated_true foreign message",
+                  "tenant_id": "22222222-2222-2222-2222-222222222222",
+                  "created_at": "2026-07-19T15:09:53.746+00:00",
+                  "property_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+                  "sender_type": "association",
+                  "resident_user_id": "10000000-0000-0000-0000-000000000002",
+                  "delivery_sequence": 3,
+                  "sender_profile_id": null,
+                  "support_request_id": "70000000-0000-0000-0000-000000000002",
+                  "resident_profile_id": "20000000-0000-0000-0000-000000000002",
+                  "resident_access_revoked": false
+                },
+                "old": {},
+                "errors": null
+              }
+            },
+            {
+              "received_at": "2026-07-19T15:09:56.580Z",
+              "payload": {
+                "schema": "public",
+                "table": "support_messages",
+                "commit_timestamp": "2026-07-19T15:09:56.033Z",
+                "eventType": "INSERT",
+                "new": {
+                  "id": "1e550c1d-eaa4-4b0e-9e13-5aa46af6817d",
+                  "content": "P1_authenticated_true unrelated message",
+                  "tenant_id": "11111111-1111-1111-1111-111111111111",
+                  "created_at": "2026-07-19T15:09:55.914+00:00",
+                  "property_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+                  "sender_type": "association",
+                  "resident_user_id": "10000000-0000-0000-0000-000000000001",
+                  "delivery_sequence": 4,
+                  "sender_profile_id": null,
+                  "support_request_id": "70000000-0000-0000-0000-000000000001",
+                  "resident_profile_id": "20000000-0000-0000-0000-000000000001",
+                  "resident_access_revoked": false
+                },
+                "old": {},
+                "errors": null
+              }
+            }
+          ],
+          "authorized_rows": [
+            {
+              "id": "6f8afb2d-bce7-4997-87e3-614c9dc91c3c",
+              "content": "P1_authenticated_true authorized message",
+              "tenant_id": "11111111-1111-1111-1111-111111111111",
+              "created_at": "2026-07-19T15:09:53.08+00:00",
+              "property_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+              "sender_type": "association",
+              "resident_user_id": "10000000-0000-0000-0000-000000000001",
+              "delivery_sequence": 2,
+              "sender_profile_id": null,
+              "support_request_id": "70000000-0000-0000-0000-000000000001",
+              "resident_profile_id": "20000000-0000-0000-0000-000000000001",
+              "resident_access_revoked": false
+            },
+            {
+              "id": "e80a0fc7-867e-43e8-8735-ebfe30475d54",
+              "content": "P1_authenticated_true foreign message",
+              "tenant_id": "22222222-2222-2222-2222-222222222222",
+              "created_at": "2026-07-19T15:09:53.746+00:00",
+              "property_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+              "sender_type": "association",
+              "resident_user_id": "10000000-0000-0000-0000-000000000002",
+              "delivery_sequence": 3,
+              "sender_profile_id": null,
+              "support_request_id": "70000000-0000-0000-0000-000000000002",
+              "resident_profile_id": "20000000-0000-0000-0000-000000000002",
+              "resident_access_revoked": false
+            },
+            {
+              "id": "1e550c1d-eaa4-4b0e-9e13-5aa46af6817d",
+              "content": "P1_authenticated_true unrelated message",
+              "tenant_id": "11111111-1111-1111-1111-111111111111",
+              "created_at": "2026-07-19T15:09:55.914+00:00",
+              "property_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+              "sender_type": "association",
+              "resident_user_id": "10000000-0000-0000-0000-000000000001",
+              "delivery_sequence": 4,
+              "sender_profile_id": null,
+              "support_request_id": "70000000-0000-0000-0000-000000000001",
+              "resident_profile_id": "20000000-0000-0000-0000-000000000001",
+              "resident_access_revoked": false
+            }
+          ],
+          "unauthorized_envelopes": []
+        },
+        "rt05": {
+          "statuses": [
+            {
+              "status": "SUBSCRIBED",
+              "error": null,
+              "at": "2026-07-19T15:09:53.494Z"
+            },
+            {
+              "status": "CLOSED",
+              "error": null,
+              "at": "2026-07-19T15:09:57.886Z"
+            },
+            {
+              "status": "CLOSED",
+              "error": null,
+              "at": "2026-07-19T15:09:57.888Z"
+            }
+          ],
+          "channel_status": "SUBSCRIBED",
+          "observation": {
+            "baseline_count": 0,
+            "final_count": 0,
+            "passed": true,
+            "received_event_buffer": []
+          }
+        },
+        "rt06": {
+          "statuses": [
+            {
+              "status": "SUBSCRIBED",
+              "error": null,
+              "at": "2026-07-19T15:09:55.664Z"
+            },
+            {
+              "status": "CLOSED",
+              "error": null,
+              "at": "2026-07-19T15:09:57.886Z"
+            },
+            {
+              "status": "CLOSED",
+              "error": null,
+              "at": "2026-07-19T15:09:57.888Z"
+            }
+          ],
+          "channel_status": "SUBSCRIBED",
+          "observation": {
+            "baseline_count": 0,
+            "final_count": 1,
+            "passed": false,
+            "received_event_buffer": [
+              {
+                "received_at": "2026-07-19T15:09:56.579Z",
+                "payload": {
+                  "schema": "public",
+                  "table": "support_messages",
+                  "commit_timestamp": "2026-07-19T15:09:56.033Z",
+                  "eventType": "INSERT",
+                  "new": {
+                    "id": "1e550c1d-eaa4-4b0e-9e13-5aa46af6817d",
+                    "content": "P1_authenticated_true unrelated message",
+                    "tenant_id": "11111111-1111-1111-1111-111111111111",
+                    "created_at": "2026-07-19T15:09:55.914+00:00",
+                    "property_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+                    "sender_type": "association",
+                    "resident_user_id": "10000000-0000-0000-0000-000000000001",
+                    "delivery_sequence": 4,
+                    "sender_profile_id": null,
+                    "support_request_id": "70000000-0000-0000-0000-000000000001",
+                    "resident_profile_id": "20000000-0000-0000-0000-000000000001",
+                    "resident_access_revoked": false
+                  },
+                  "old": {},
+                  "errors": null
+                }
+              }
+            ]
+          }
+        },
+        "rt08": {
+          "status": 200,
+          "error": null,
+          "row_ids": [
+            "80000000-0000-0000-0000-000000000001",
+            "6f8afb2d-bce7-4997-87e3-614c9dc91c3c",
+            "e80a0fc7-867e-43e8-8735-ebfe30475d54",
+            "1e550c1d-eaa4-4b0e-9e13-5aa46af6817d"
+          ],
+          "unauthorized_row_count": 1
+        }
+      },
+      "p2_authenticated_uid": {
+        "id": "P2_authenticated_uid",
+        "description": "USING (resident_user_id = auth.uid()) with TO authenticated",
+        "policy": {
+          "scope": "authenticated",
+          "expression": "resident_user_id = auth.uid()"
+        },
+        "replica_identity": "DEFAULT",
+        "filter": null,
+        "rt04": {
+          "statuses": [
+            {
+              "status": "SUBSCRIBED",
+              "error": null,
+              "at": "2026-07-19T15:10:03.289Z"
+            },
+            {
+              "status": "CLOSED",
+              "error": null,
+              "at": "2026-07-19T15:10:08.247Z"
+            },
+            {
+              "status": "CLOSED",
+              "error": null,
+              "at": "2026-07-19T15:10:08.247Z"
+            }
+          ],
+          "channel_status": "SUBSCRIBED",
+          "events": [
+            {
+              "received_at": "2026-07-19T15:10:03.843Z",
+              "payload": {
+                "schema": "public",
+                "table": "support_messages",
+                "commit_timestamp": "2026-07-19T15:10:03.680Z",
+                "eventType": "INSERT",
+                "new": {
+                  "id": "8dade832-0af5-4b27-91dd-86f54c106156",
+                  "content": "P2_authenticated_uid authorized message",
+                  "tenant_id": "11111111-1111-1111-1111-111111111111",
+                  "created_at": "2026-07-19T15:10:03.539+00:00",
+                  "property_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+                  "sender_type": "association",
+                  "resident_user_id": "10000000-0000-0000-0000-000000000001",
+                  "delivery_sequence": 8,
+                  "sender_profile_id": null,
+                  "support_request_id": "70000000-0000-0000-0000-000000000001",
+                  "resident_profile_id": "20000000-0000-0000-0000-000000000001",
+                  "resident_access_revoked": false
+                },
+                "old": {},
+                "errors": null
+              }
+            },
+            {
+              "received_at": "2026-07-19T15:10:06.591Z",
+              "payload": {
+                "schema": "public",
+                "table": "support_messages",
+                "commit_timestamp": "2026-07-19T15:10:06.407Z",
+                "eventType": "INSERT",
+                "new": {
+                  "id": "3df42685-03f8-4ed1-9583-248e08b3940b",
+                  "content": "P2_authenticated_uid unrelated message",
+                  "tenant_id": "11111111-1111-1111-1111-111111111111",
+                  "created_at": "2026-07-19T15:10:06.296+00:00",
+                  "property_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+                  "sender_type": "association",
+                  "resident_user_id": "10000000-0000-0000-0000-000000000001",
+                  "delivery_sequence": 10,
+                  "sender_profile_id": null,
+                  "support_request_id": "70000000-0000-0000-0000-000000000001",
+                  "resident_profile_id": "20000000-0000-0000-0000-000000000001",
+                  "resident_access_revoked": false
+                },
+                "old": {},
+                "errors": null
+              }
+            }
+          ],
+          "authorized_rows": [
+            {
+              "id": "8dade832-0af5-4b27-91dd-86f54c106156",
+              "content": "P2_authenticated_uid authorized message",
+              "tenant_id": "11111111-1111-1111-1111-111111111111",
+              "created_at": "2026-07-19T15:10:03.539+00:00",
+              "property_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+              "sender_type": "association",
+              "resident_user_id": "10000000-0000-0000-0000-000000000001",
+              "delivery_sequence": 8,
+              "sender_profile_id": null,
+              "support_request_id": "70000000-0000-0000-0000-000000000001",
+              "resident_profile_id": "20000000-0000-0000-0000-000000000001",
+              "resident_access_revoked": false
+            },
+            {
+              "id": "3df42685-03f8-4ed1-9583-248e08b3940b",
+              "content": "P2_authenticated_uid unrelated message",
+              "tenant_id": "11111111-1111-1111-1111-111111111111",
+              "created_at": "2026-07-19T15:10:06.296+00:00",
+              "property_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+              "sender_type": "association",
+              "resident_user_id": "10000000-0000-0000-0000-000000000001",
+              "delivery_sequence": 10,
+              "sender_profile_id": null,
+              "support_request_id": "70000000-0000-0000-0000-000000000001",
+              "resident_profile_id": "20000000-0000-0000-0000-000000000001",
+              "resident_access_revoked": false
+            }
+          ],
+          "unauthorized_envelopes": []
+        },
+        "rt05": {
+          "statuses": [
+            {
+              "status": "SUBSCRIBED",
+              "error": null,
+              "at": "2026-07-19T15:10:03.888Z"
+            },
+            {
+              "status": "CLOSED",
+              "error": null,
+              "at": "2026-07-19T15:10:08.247Z"
+            },
+            {
+              "status": "CLOSED",
+              "error": null,
+              "at": "2026-07-19T15:10:08.247Z"
+            }
+          ],
+          "channel_status": "SUBSCRIBED",
+          "observation": {
+            "baseline_count": 0,
+            "final_count": 0,
+            "passed": true,
+            "received_event_buffer": []
+          }
+        },
+        "rt06": {
+          "statuses": [
+            {
+              "status": "SUBSCRIBED",
+              "error": null,
+              "at": "2026-07-19T15:10:06.044Z"
+            },
+            {
+              "status": "CLOSED",
+              "error": null,
+              "at": "2026-07-19T15:10:08.247Z"
+            },
+            {
+              "status": "CLOSED",
+              "error": null,
+              "at": "2026-07-19T15:10:08.250Z"
+            }
+          ],
+          "channel_status": "SUBSCRIBED",
+          "observation": {
+            "baseline_count": 0,
+            "final_count": 0,
+            "passed": true,
+            "received_event_buffer": []
+          }
+        },
+        "rt08": {
+          "status": 200,
+          "error": null,
+          "row_ids": [
+            "80000000-0000-0000-0000-000000000001",
+            "6f8afb2d-bce7-4997-87e3-614c9dc91c3c",
+            "1e550c1d-eaa4-4b0e-9e13-5aa46af6817d",
+            "62b6bd82-9ca7-41ad-97cf-81464179bf63",
+            "5916d2fc-df25-4eca-b3c2-1e4bfd738b6f",
+            "8dade832-0af5-4b27-91dd-86f54c106156",
+            "3df42685-03f8-4ed1-9583-248e08b3940b"
+          ],
+          "unauthorized_row_count": 0
+        }
+      },
+      "control_authenticated": {
+        "scope": "authenticated",
+        "authorized": {
+          "channel_status": "SUBSCRIBED",
+          "statuses": [
+            {
+              "status": "SUBSCRIBED",
+              "error": null,
+              "at": "2026-07-19T15:10:35.269Z"
+            },
+            {
+              "status": "CLOSED",
+              "error": null,
+              "at": "2026-07-19T15:10:40.425Z"
+            },
+            {
+              "status": "CLOSED",
+              "error": null,
+              "at": "2026-07-19T15:10:40.428Z"
+            }
+          ],
+          "events": [
+            {
+              "received_at": "2026-07-19T15:10:35.956Z",
+              "payload": {
+                "schema": "public",
+                "table": "realtime_owner_probe",
+                "commit_timestamp": "2026-07-19T15:10:35.615Z",
+                "eventType": "INSERT",
+                "new": {
+                  "id": "af0fa3c6-f5f6-4f0a-ad69-81b32a39082a",
+                  "payload": "owner authenticated",
+                  "created_at": "2026-07-19T15:10:35.52+00:00",
+                  "owner_user_id": "10000000-0000-0000-0000-000000000001"
+                },
+                "old": {},
+                "errors": null
+              }
+            },
+            {
+              "received_at": "2026-07-19T15:10:39.097Z",
+              "payload": {
+                "schema": "public",
+                "table": "realtime_owner_probe",
+                "commit_timestamp": "2026-07-19T15:10:38.593Z",
+                "eventType": "INSERT",
+                "new": {
+                  "id": "c63d92b4-56a1-4e5f-886e-61c2829f85d7",
+                  "payload": "unrelated authenticated",
+                  "created_at": "2026-07-19T15:10:38.458+00:00",
+                  "owner_user_id": "10000000-0000-0000-0000-000000000001"
+                },
+                "old": {},
+                "errors": null
+              }
+            }
+          ],
+          "authorized_rows": [
+            {
+              "id": "af0fa3c6-f5f6-4f0a-ad69-81b32a39082a",
+              "payload": "owner authenticated",
+              "created_at": "2026-07-19T15:10:35.52+00:00",
+              "owner_user_id": "10000000-0000-0000-0000-000000000001"
+            },
+            {
+              "id": "c63d92b4-56a1-4e5f-886e-61c2829f85d7",
+              "payload": "unrelated authenticated",
+              "created_at": "2026-07-19T15:10:38.458+00:00",
+              "owner_user_id": "10000000-0000-0000-0000-000000000001"
+            }
+          ],
+          "unauthorized_envelopes": []
+        },
+        "foreign": {
+          "channel_status": "SUBSCRIBED",
+          "statuses": [
+            {
+              "status": "SUBSCRIBED",
+              "error": null,
+              "at": "2026-07-19T15:10:36.032Z"
+            },
+            {
+              "status": "CLOSED",
+              "error": null,
+              "at": "2026-07-19T15:10:40.426Z"
+            },
+            {
+              "status": "CLOSED",
+              "error": null,
+              "at": "2026-07-19T15:10:40.428Z"
+            }
+          ],
+          "observation": {
+            "baseline_count": 0,
+            "final_count": 1,
+            "passed": false,
+            "received_event_buffer": [
+              {
+                "received_at": "2026-07-19T15:10:36.486Z",
+                "payload": {
+                  "schema": "public",
+                  "table": "realtime_owner_probe",
+                  "commit_timestamp": null,
+                  "eventType": "INSERT",
+                  "new": {},
+                  "old": {},
+                  "errors": [
+                    "Error 401: Unauthorized"
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "unrelated": {
+          "channel_status": "SUBSCRIBED",
+          "statuses": [
+            {
+              "status": "SUBSCRIBED",
+              "error": null,
+              "at": "2026-07-19T15:10:38.208Z"
+            },
+            {
+              "status": "CLOSED",
+              "error": null,
+              "at": "2026-07-19T15:10:40.427Z"
+            },
+            {
+              "status": "CLOSED",
+              "error": null,
+              "at": "2026-07-19T15:10:40.428Z"
+            }
+          ],
+          "observation": {
+            "baseline_count": 0,
+            "final_count": 0,
+            "passed": true,
+            "received_event_buffer": []
+          }
+        }
+      },
+      "p6_final_public": {
+        "id": "P6_final_public",
+        "description": "Final approved resident predicate with operator and platform admin policies, no TO clause",
+        "policy": {
+          "scope": "public",
+          "expression": "resident_user_id = auth.uid() AND resident_access_revoked = false",
+          "includeOperator": true,
+          "includePlatformAdmin": true
+        },
+        "replica_identity": "DEFAULT",
+        "filter": null,
+        "rt04": {
+          "statuses": [
+            {
+              "status": "SUBSCRIBED",
+              "error": null,
+              "at": "2026-07-19T15:10:29.863Z"
+            },
+            {
+              "status": "CLOSED",
+              "error": null,
+              "at": "2026-07-19T15:10:34.957Z"
+            },
+            {
+              "status": "CLOSED",
+              "error": null,
+              "at": "2026-07-19T15:10:34.958Z"
+            }
+          ],
+          "channel_status": "SUBSCRIBED",
+          "events": [
+            {
+              "received_at": "2026-07-19T15:10:30.488Z",
+              "payload": {
+                "schema": "public",
+                "table": "support_messages",
+                "commit_timestamp": "2026-07-19T15:10:30.203Z",
+                "eventType": "INSERT",
+                "new": {
+                  "id": "d75f177c-835f-4182-aadc-7c7f501fcd24",
+                  "content": "P6_final_public authorized message",
+                  "tenant_id": "11111111-1111-1111-1111-111111111111",
+                  "created_at": "2026-07-19T15:10:30.113+00:00",
+                  "property_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+                  "sender_type": "association",
+                  "resident_user_id": "10000000-0000-0000-0000-000000000001",
+                  "delivery_sequence": 23,
+                  "sender_profile_id": null,
+                  "support_request_id": "70000000-0000-0000-0000-000000000001",
+                  "resident_profile_id": "20000000-0000-0000-0000-000000000001",
+                  "resident_access_revoked": false
+                },
+                "old": {},
+                "errors": null
+              }
+            },
+            {
+              "received_at": "2026-07-19T15:10:33.345Z",
+              "payload": {
+                "schema": "public",
+                "table": "support_messages",
+                "commit_timestamp": "2026-07-19T15:10:33.102Z",
+                "eventType": "INSERT",
+                "new": {
+                  "id": "f13ca2c2-122b-45a8-9b93-b6fb4bb7e5d7",
+                  "content": "P6_final_public unrelated message",
+                  "tenant_id": "11111111-1111-1111-1111-111111111111",
+                  "created_at": "2026-07-19T15:10:32.955+00:00",
+                  "property_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+                  "sender_type": "association",
+                  "resident_user_id": "10000000-0000-0000-0000-000000000001",
+                  "delivery_sequence": 25,
+                  "sender_profile_id": null,
+                  "support_request_id": "70000000-0000-0000-0000-000000000001",
+                  "resident_profile_id": "20000000-0000-0000-0000-000000000001",
+                  "resident_access_revoked": false
+                },
+                "old": {},
+                "errors": null
+              }
+            }
+          ],
+          "authorized_rows": [
+            {
+              "id": "d75f177c-835f-4182-aadc-7c7f501fcd24",
+              "content": "P6_final_public authorized message",
+              "tenant_id": "11111111-1111-1111-1111-111111111111",
+              "created_at": "2026-07-19T15:10:30.113+00:00",
+              "property_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+              "sender_type": "association",
+              "resident_user_id": "10000000-0000-0000-0000-000000000001",
+              "delivery_sequence": 23,
+              "sender_profile_id": null,
+              "support_request_id": "70000000-0000-0000-0000-000000000001",
+              "resident_profile_id": "20000000-0000-0000-0000-000000000001",
+              "resident_access_revoked": false
+            },
+            {
+              "id": "f13ca2c2-122b-45a8-9b93-b6fb4bb7e5d7",
+              "content": "P6_final_public unrelated message",
+              "tenant_id": "11111111-1111-1111-1111-111111111111",
+              "created_at": "2026-07-19T15:10:32.955+00:00",
+              "property_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+              "sender_type": "association",
+              "resident_user_id": "10000000-0000-0000-0000-000000000001",
+              "delivery_sequence": 25,
+              "sender_profile_id": null,
+              "support_request_id": "70000000-0000-0000-0000-000000000001",
+              "resident_profile_id": "20000000-0000-0000-0000-000000000001",
+              "resident_access_revoked": false
+            }
+          ],
+          "unauthorized_envelopes": []
+        },
+        "rt05": {
+          "statuses": [
+            {
+              "status": "SUBSCRIBED",
+              "error": null,
+              "at": "2026-07-19T15:10:30.519Z"
+            },
+            {
+              "status": "CLOSED",
+              "error": null,
+              "at": "2026-07-19T15:10:34.957Z"
+            },
+            {
+              "status": "CLOSED",
+              "error": null,
+              "at": "2026-07-19T15:10:34.958Z"
+            }
+          ],
+          "channel_status": "SUBSCRIBED",
+          "observation": {
+            "baseline_count": 0,
+            "final_count": 0,
+            "passed": true,
+            "received_event_buffer": []
+          }
+        },
+        "rt06": {
+          "statuses": [
+            {
+              "status": "SUBSCRIBED",
+              "error": null,
+              "at": "2026-07-19T15:10:32.704Z"
+            },
+            {
+              "status": "CLOSED",
+              "error": null,
+              "at": "2026-07-19T15:10:34.957Z"
+            },
+            {
+              "status": "CLOSED",
+              "error": null,
+              "at": "2026-07-19T15:10:34.958Z"
+            }
+          ],
+          "channel_status": "SUBSCRIBED",
+          "observation": {
+            "baseline_count": 0,
+            "final_count": 0,
+            "passed": true,
+            "received_event_buffer": []
+          }
+        },
+        "rt08": {
+          "status": 200,
+          "error": null,
+          "row_ids": [
+            "80000000-0000-0000-0000-000000000001",
+            "6f8afb2d-bce7-4997-87e3-614c9dc91c3c",
+            "1e550c1d-eaa4-4b0e-9e13-5aa46af6817d",
+            "62b6bd82-9ca7-41ad-97cf-81464179bf63",
+            "5916d2fc-df25-4eca-b3c2-1e4bfd738b6f",
+            "8dade832-0af5-4b27-91dd-86f54c106156",
+            "3df42685-03f8-4ed1-9583-248e08b3940b",
+            "74625e82-c13c-4050-9369-c6f164d4d63a",
+            "cae7ca51-0fac-4de3-8312-0eeff237085c",
+            "b75ef1c6-a2bd-4185-b981-ec108bebd9cd",
+            "aa215104-5d00-45f3-b7a2-75e6f2206516",
+            "4c6053b5-cbcd-4656-b371-046d147ee9aa",
+            "643d8cdf-fbe2-4b08-bde3-0716d45f4eae",
+            "676da9f6-4145-4bf0-a627-1920fb2bfd19",
+            "2c4cc3fe-a210-4b49-a43d-2e226abd2467",
+            "d75f177c-835f-4182-aadc-7c7f501fcd24",
+            "f13ca2c2-122b-45a8-9b93-b6fb4bb7e5d7"
+          ],
+          "unauthorized_row_count": 0
+        }
+      }
+    },
+    "policy_scope_conclusion": "The direct ownership policy was compatible with Realtime once the harness propagated the final token on every channel join and stopped reusing stale clients across unrelated scenarios.",
+    "minimal_correction": "Refresh Realtime auth with the final token before every channel subscribe and use fresh authenticated clients for independent runtime scenarios in the validation harness."
+  },
+  "runtime_probe": {
+    "exit_code": 0,
+    "evidence": {
+      "generated_at": "2026-07-19T15:10:49.081Z",
+      "environment": {
+        "type": "local-supabase-cli",
+        "api_url": "http://127.0.0.1:54331",
+        "project_reference": "aistudio-hoa-connect-resident-app",
+        "classification": "non-production local disposable stack"
+      },
+      "adr09": {
+        "selected_model": "B1 direct resident ownership projection",
+        "observation_duration_ms": 2000,
+        "rt01": {
+          "statuses": [
+            {
+              "status": "SUBSCRIBED",
+              "error": null,
+              "at": "2026-07-19T15:10:50.084Z"
+            }
+          ],
+          "inserted_id": "bf84d9df-2f66-4da0-8af6-2bf560ca4e3c",
+          "delivered_count": 1,
+          "payload": {
+            "schema": "public",
+            "table": "notifications",
+            "commit_timestamp": "2026-07-19T15:10:50.465Z",
+            "eventType": "INSERT",
+            "new": {
+              "id": "bf84d9df-2f66-4da0-8af6-2bf560ca4e3c",
+              "params": {},
+              "read_at": null,
+              "body_key": "rt01.body",
+              "category": "invoice",
+              "tenant_id": "11111111-1111-1111-1111-111111111111",
+              "title_key": "rt01.title",
+              "created_at": "2026-07-19T15:10:50.462704+00:00",
+              "profile_id": "20000000-0000-0000-0000-000000000001"
+            },
+            "old": {},
+            "errors": null
+          }
+        },
+        "rt02": {
+          "label": "rt02",
+          "channel_status": "SUBSCRIBED",
+          "observation_duration_ms": 2000,
+          "inserted_at": "2026-07-19T15:10:50.678Z",
+          "baseline_count": 1,
+          "final_count": 1,
+          "received_event_buffer": [],
+          "passed": true
+        },
+        "rt03": {
+          "label": "rt03",
+          "channel_status": "SUBSCRIBED",
+          "observation_duration_ms": 2000,
+          "inserted_at": "2026-07-19T15:10:53.067Z",
+          "baseline_count": 0,
+          "final_count": 0,
+          "received_event_buffer": [],
+          "passed": true
+        },
+        "rt04": {
+          "statuses": [
+            {
+              "status": "SUBSCRIBED",
+              "error": null,
+              "at": "2026-07-19T15:10:55.086Z"
+            }
+          ],
+          "inserted_id": "6d38c00b-979c-4124-b9ac-4e3be88ddb39",
+          "delivered_count": 1,
+          "authorized_rows": [
+            {
+              "id": "6d38c00b-979c-4124-b9ac-4e3be88ddb39",
+              "content": "Runtime validation message A",
+              "tenant_id": "11111111-1111-1111-1111-111111111111",
+              "created_at": "2026-07-19T10:53:37.862+00:00",
+              "property_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+              "sender_type": "association",
+              "resident_user_id": "10000000-0000-0000-0000-000000000001",
+              "delivery_sequence": 2,
+              "sender_profile_id": null,
+              "support_request_id": "70000000-0000-0000-0000-000000000001",
+              "resident_profile_id": "20000000-0000-0000-0000-000000000001",
+              "resident_access_revoked": false
+            }
+          ],
+          "unauthorized_envelopes": [],
+          "payload": {
+            "schema": "public",
+            "table": "support_messages",
+            "commit_timestamp": "2026-07-19T15:10:55.426Z",
+            "eventType": "INSERT",
+            "new": {
+              "id": "6d38c00b-979c-4124-b9ac-4e3be88ddb39",
+              "content": "Runtime validation message A",
+              "tenant_id": "11111111-1111-1111-1111-111111111111",
+              "created_at": "2026-07-19T10:53:37.862+00:00",
+              "property_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+              "sender_type": "association",
+              "resident_user_id": "10000000-0000-0000-0000-000000000001",
+              "delivery_sequence": 2,
+              "sender_profile_id": null,
+              "support_request_id": "70000000-0000-0000-0000-000000000001",
+              "resident_profile_id": "20000000-0000-0000-0000-000000000001",
+              "resident_access_revoked": false
+            },
+            "old": {},
+            "errors": null
+          }
+        },
+        "rt05": {
+          "statuses": [
+            {
+              "status": "SUBSCRIBED",
+              "error": null,
+              "at": "2026-07-19T15:10:55.954Z"
+            }
+          ],
+          "evidence": {
+            "label": "rt05",
+            "channel_status": "SUBSCRIBED",
+            "observation_duration_ms": 2000,
+            "inserted_at": "2026-07-19T15:10:56.310Z",
+            "baseline_count": 0,
+            "final_count": 0,
+            "received_event_buffer": [],
+            "passed": true
+          }
+        },
+        "rt06": {
+          "statuses": [
+            {
+              "status": "SUBSCRIBED",
+              "error": null,
+              "at": "2026-07-19T15:10:58.323Z"
+            }
+          ],
+          "evidence": {
+            "label": "rt06",
+            "channel_status": "SUBSCRIBED",
+            "observation_duration_ms": 2000,
+            "inserted_at": "2026-07-19T15:10:58.665Z",
+            "baseline_count": 0,
+            "final_count": 0,
+            "received_event_buffer": [],
+            "passed": true
+          }
+        },
+        "rt07": {
+          "request_filter": "support_request_id=eq.70000000-0000-0000-0000-000000000099",
+          "request_evidence": {
+            "label": "rt07_request",
+            "channel_status": "SUBSCRIBED",
+            "observation_duration_ms": 2000,
+            "inserted_at": "2026-07-19T15:11:00.927Z",
+            "baseline_count": 0,
+            "final_count": 0,
+            "received_event_buffer": [],
+            "passed": true
+          }
+        },
+        "rt08": {
+          "status": 200,
+          "row_ids": [
+            "80000000-0000-0000-0000-000000000001",
+            "6d38c00b-979c-4124-b9ac-4e3be88ddb39",
+            "0eb8af30-a01f-4718-b957-7b8dca8b74cd"
+          ],
+          "unauthorized_row_count": 0
+        },
+        "rt09": {
+          "approved_only": true,
+          "row_keys": [
+            "content",
+            "created_at",
+            "delivery_sequence",
+            "id",
+            "property_id",
+            "resident_access_revoked",
+            "resident_profile_id",
+            "resident_user_id",
+            "sender_profile_id",
+            "sender_type",
+            "support_request_id",
+            "tenant_id"
+          ]
+        },
+        "rt10": {
+          "inserted_id": "6d38c00b-979c-4124-b9ac-4e3be88ddb39",
+          "delivered_count": 1
+        },
+        "rt11": {
+          "inserted_ids": [
+            "f1a0256f-fa38-41c7-bd05-cc39e92becec",
+            "46a3f4a8-c69a-4439-8fc5-fe5922e3e6d9"
+          ],
+          "ordering_rows": [
+            {
+              "id": "f1a0256f-fa38-41c7-bd05-cc39e92becec",
+              "created_at": "2026-07-19T10:53:42+00:00",
+              "delivery_sequence": 5
+            },
+            {
+              "id": "46a3f4a8-c69a-4439-8fc5-fe5922e3e6d9",
+              "created_at": "2026-07-19T10:53:43+00:00",
+              "delivery_sequence": 6
+            }
+          ]
+        },
+        "rt12": {
+          "label": "rt12",
+          "channel_status": "SUBSCRIBED",
+          "observation_duration_ms": 2000,
+          "inserted_at": "2026-07-19T15:11:04.181Z",
+          "baseline_count": 0,
+          "final_count": 0,
+          "received_event_buffer": [],
+          "passed": true
+        },
+        "rt13": {
+          "tenant_a_statuses": [
+            {
+              "status": "SUBSCRIBED",
+              "error": null,
+              "at": "2026-07-19T15:11:06.332Z"
+            }
+          ],
+          "tenant_b_statuses": [
+            {
+              "status": "SUBSCRIBED",
+              "error": null,
+              "at": "2026-07-19T15:11:06.592Z"
+            }
+          ],
+          "tenant_a_events": [
+            "85b1a9d0-b6ac-42c6-bfa1-204c5ec11a7c"
+          ],
+          "tenant_b_events": [
+            "c848e8f1-d3cb-4732-bd18-11d542080241"
+          ],
+          "tenant_a_unauthorized_envelopes": [],
+          "tenant_b_unauthorized_envelopes": []
+        },
+        "rt14": {
+          "reconnect_statuses": [
+            {
+              "status": "SUBSCRIBED",
+              "error": null,
+              "at": "2026-07-19T15:11:07.452Z"
+            }
+          ],
+          "delivered_count": 1,
+          "event_ids": [
+            "9cfb57a5-98e9-48c8-9a82-fc6256a22dd8"
+          ],
+          "unauthorized_envelopes": []
+        }
+      },
+      "adr10_api_surface": {
+        "pr10_enumeration_resistance": {
+          "resident_profiles_status": 403,
+          "resident_profiles_error": "permission denied for table profiles",
+          "operator_profiles_status": 403,
+          "operator_profiles_error": "permission denied for table profiles",
+          "unrelated_profiles_status": 403,
+          "unrelated_profiles_error": "permission denied for table profiles"
+        },
+        "pr11_sensitive_field_exposure": {
+          "note": "Direct PostgREST access to profiles is denied because authenticated has no SELECT grant on profiles."
+        }
+      },
+      "failures": []
+    },
+    "stdout": "{\n  \"generated_at\": \"2026-07-19T15:10:49.081Z\",\n  \"environment\": {\n    \"type\": \"local-supabase-cli\",\n    \"api_url\": \"http://127.0.0.1:54331\",\n    \"project_reference\": \"aistudio-hoa-connect-resident-app\",\n    \"classification\": \"non-production local disposable stack\"\n  },\n  \"adr09\": {\n    \"selected_model\": \"B1 direct resident ownership projection\",\n    \"observation_duration_ms\": 2000,\n    \"rt01\": {\n      \"statuses\": [\n        {\n          \"status\": \"SUBSCRIBED\",\n          \"error\": null,\n          \"at\": \"2026-07-19T15:10:50.084Z\"\n        }\n      ],\n      \"inserted_id\": \"bf84d9df-2f66-4da0-8af6-2bf560ca4e3c\",\n      \"delivered_count\": 1,\n      \"payload\": {\n        \"schema\": \"public\",\n        \"table\": \"notifications\",\n        \"commit_timestamp\": \"2026-07-19T15:10:50.465Z\",\n        \"eventType\": \"INSERT\",\n        \"new\": {\n          \"id\": \"bf84d9df-2f66-4da0-8af6-2bf560ca4e3c\",\n          \"params\": {},\n          \"read_at\": null,\n          \"body_key\": \"rt01.body\",\n          \"category\": \"invoice\",\n          \"tenant_id\": \"11111111-1111-1111-1111-111111111111\",\n          \"title_key\": \"rt01.title\",\n          \"created_at\": \"2026-07-19T15:10:50.462704+00:00\",\n          \"profile_id\": \"20000000-0000-0000-0000-000000000001\"\n        },\n        \"old\": {},\n        \"errors\": null\n      }\n    },\n    \"rt02\": {\n      \"label\": \"rt02\",\n      \"channel_status\": \"SUBSCRIBED\",\n      \"observation_duration_ms\": 2000,\n      \"inserted_at\": \"2026-07-19T15:10:50.678Z\",\n      \"baseline_count\": 1,\n      \"final_count\": 1,\n      \"received_event_buffer\": [],\n      \"passed\": true\n    },\n    \"rt03\": {\n      \"label\": \"rt03\",\n      \"channel_status\": \"SUBSCRIBED\",\n      \"observation_duration_ms\": 2000,\n      \"inserted_at\": \"2026-07-19T15:10:53.067Z\",\n      \"baseline_count\": 0,\n      \"final_count\": 0,\n      \"received_event_buffer\": [],\n      \"passed\": true\n    },\n    \"rt04\": {\n      \"statuses\": [\n        {\n          \"status\": \"SUBSCRIBED\",\n          \"error\": null,\n          \"at\": \"2026-07-19T15:10:55.086Z\"\n        }\n      ],\n      \"inserted_id\": \"6d38c00b-979c-4124-b9ac-4e3be88ddb39\",\n      \"delivered_count\": 1,\n      \"authorized_rows\": [\n        {\n          \"id\": \"6d38c00b-979c-4124-b9ac-4e3be88ddb39\",\n          \"content\": \"Runtime validation message A\",\n          \"tenant_id\": \"11111111-1111-1111-1111-111111111111\",\n          \"created_at\": \"2026-07-19T10:53:37.862+00:00\",\n          \"property_id\": \"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa\",\n          \"sender_type\": \"association\",\n          \"resident_user_id\": \"10000000-0000-0000-0000-000000000001\",\n          \"delivery_sequence\": 2,\n          \"sender_profile_id\": null,\n          \"support_request_id\": \"70000000-0000-0000-0000-000000000001\",\n          \"resident_profile_id\": \"20000000-0000-0000-0000-000000000001\",\n          \"resident_access_revoked\": false\n        }\n      ],\n      \"unauthorized_envelopes\": [],\n      \"payload\": {\n        \"schema\": \"public\",\n        \"table\": \"support_messages\",\n        \"commit_timestamp\": \"2026-07-19T15:10:55.426Z\",\n        \"eventType\": \"INSERT\",\n        \"new\": {\n          \"id\": \"6d38c00b-979c-4124-b9ac-4e3be88ddb39\",\n          \"content\": \"Runtime validation message A\",\n          \"tenant_id\": \"11111111-1111-1111-1111-111111111111\",\n          \"created_at\": \"2026-07-19T10:53:37.862+00:00\",\n          \"property_id\": \"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa\",\n          \"sender_type\": \"association\",\n          \"resident_user_id\": \"10000000-0000-0000-0000-000000000001\",\n          \"delivery_sequence\": 2,\n          \"sender_profile_id\": null,\n          \"support_request_id\": \"70000000-0000-0000-0000-000000000001\",\n          \"resident_profile_id\": \"20000000-0000-0000-0000-000000000001\",\n          \"resident_access_revoked\": false\n        },\n        \"old\": {},\n        \"errors\": null\n      }\n    },\n    \"rt05\": {\n      \"statuses\": [\n        {\n          \"status\": \"SUBSCRIBED\",\n          \"error\": null,\n          \"at\": \"2026-07-19T15:10:55.954Z\"\n        }\n      ],\n      \"evidence\": {\n        \"label\": \"rt05\",\n        \"channel_status\": \"SUBSCRIBED\",\n        \"observation_duration_ms\": 2000,\n        \"inserted_at\": \"2026-07-19T15:10:56.310Z\",\n        \"baseline_count\": 0,\n        \"final_count\": 0,\n        \"received_event_buffer\": [],\n        \"passed\": true\n      }\n    },\n    \"rt06\": {\n      \"statuses\": [\n        {\n          \"status\": \"SUBSCRIBED\",\n          \"error\": null,\n          \"at\": \"2026-07-19T15:10:58.323Z\"\n        }\n      ],\n      \"evidence\": {\n        \"label\": \"rt06\",\n        \"channel_status\": \"SUBSCRIBED\",\n        \"observation_duration_ms\": 2000,\n        \"inserted_at\": \"2026-07-19T15:10:58.665Z\",\n        \"baseline_count\": 0,\n        \"final_count\": 0,\n        \"received_event_buffer\": [],\n        \"passed\": true\n      }\n    },\n    \"rt07\": {\n      \"request_filter\": \"support_request_id=eq.70000000-0000-0000-0000-000000000099\",\n      \"request_evidence\": {\n        \"label\": \"rt07_request\",\n        \"channel_status\": \"SUBSCRIBED\",\n        \"observation_duration_ms\": 2000,\n        \"inserted_at\": \"2026-07-19T15:11:00.927Z\",\n        \"baseline_count\": 0,\n        \"final_count\": 0,\n        \"received_event_buffer\": [],\n        \"passed\": true\n      }\n    },\n    \"rt08\": {\n      \"status\": 200,\n      \"row_ids\": [\n        \"80000000-0000-0000-0000-000000000001\",\n        \"6d38c00b-979c-4124-b9ac-4e3be88ddb39\",\n        \"0eb8af30-a01f-4718-b957-7b8dca8b74cd\"\n      ],\n      \"unauthorized_row_count\": 0\n    },\n    \"rt09\": {\n      \"approved_only\": true,\n      \"row_keys\": [\n        \"content\",\n        \"created_at\",\n        \"delivery_sequence\",\n        \"id\",\n        \"property_id\",\n        \"resident_access_revoked\",\n        \"resident_profile_id\",\n        \"resident_user_id\",\n        \"sender_profile_id\",\n        \"sender_type\",\n        \"support_request_id\",\n        \"tenant_id\"\n      ]\n    },\n    \"rt10\": {\n      \"inserted_id\": \"6d38c00b-979c-4124-b9ac-4e3be88ddb39\",\n      \"delivered_count\": 1\n    },\n    \"rt11\": {\n      \"inserted_ids\": [\n        \"f1a0256f-fa38-41c7-bd05-cc39e92becec\",\n        \"46a3f4a8-c69a-4439-8fc5-fe5922e3e6d9\"\n      ],\n      \"ordering_rows\": [\n        {\n          \"id\": \"f1a0256f-fa38-41c7-bd05-cc39e92becec\",\n          \"created_at\": \"2026-07-19T10:53:42+00:00\",\n          \"delivery_sequence\": 5\n        },\n        {\n          \"id\": \"46a3f4a8-c69a-4439-8fc5-fe5922e3e6d9\",\n          \"created_at\": \"2026-07-19T10:53:43+00:00\",\n          \"delivery_sequence\": 6\n        }\n      ]\n    },\n    \"rt12\": {\n      \"label\": \"rt12\",\n      \"channel_status\": \"SUBSCRIBED\",\n      \"observation_duration_ms\": 2000,\n      \"inserted_at\": \"2026-07-19T15:11:04.181Z\",\n      \"baseline_count\": 0,\n      \"final_count\": 0,\n      \"received_event_buffer\": [],\n      \"passed\": true\n    },\n    \"rt13\": {\n      \"tenant_a_statuses\": [\n        {\n          \"status\": \"SUBSCRIBED\",\n          \"error\": null,\n          \"at\": \"2026-07-19T15:11:06.332Z\"\n        }\n      ],\n      \"tenant_b_statuses\": [\n        {\n          \"status\": \"SUBSCRIBED\",\n          \"error\": null,\n          \"at\": \"2026-07-19T15:11:06.592Z\"\n        }\n      ],\n      \"tenant_a_events\": [\n        \"85b1a9d0-b6ac-42c6-bfa1-204c5ec11a7c\"\n      ],\n      \"tenant_b_events\": [\n        \"c848e8f1-d3cb-4732-bd18-11d542080241\"\n      ],\n      \"tenant_a_unauthorized_envelopes\": [],\n      \"tenant_b_unauthorized_envelopes\": []\n    },\n    \"rt14\": {\n      \"reconnect_statuses\": [\n        {\n          \"status\": \"SUBSCRIBED\",\n          \"error\": null,\n          \"at\": \"2026-07-19T15:11:07.452Z\"\n        }\n      ],\n      \"delivered_count\": 1,\n      \"event_ids\": [\n        \"9cfb57a5-98e9-48c8-9a82-fc6256a22dd8\"\n      ],\n      \"unauthorized_envelopes\": []\n    }\n  },\n  \"adr10_api_surface\": {\n    \"pr10_enumeration_resistance\": {\n      \"resident_profiles_status\": 403,\n      \"resident_profiles_error\": \"permission denied for table profiles\",\n      \"operator_profiles_status\": 403,\n      \"operator_profiles_error\": \"permission denied for table profiles\",\n      \"unrelated_profiles_status\": 403,\n      \"unrelated_profiles_error\": \"permission denied for table profiles\"\n    },\n    \"pr11_sensitive_field_exposure\": {\n      \"note\": \"Direct PostgREST access to profiles is denied because authenticated has no SELECT grant on profiles.\"\n    }\n  },\n  \"failures\": []\n}",
+    "stderr": ""
+  },
+  "db_sql_tests": {
+    "output": "Pager usage is off.\n=== ADR-09 Option B / ADR-10 SQL validation ===\n\n--- Grant inspection ---\n    table_name    | authenticated_select | authenticated_insert | authenticated_update | authenticated_delete \n------------------+----------------------+----------------------+----------------------+----------------------\n notifications    | t                    | f                    | f                    | f\n support_messages | t                    | f                    | f                    | f\n profiles         | f                    | f                    | f                    | f\n profile_contacts | f                    | f                    | f                    | f\n support_requests | f                    | f                    | f                    | f\n tenant_members   | f                    | f                    | f                    | f\n tenants          | f                    | f                    | f                    | f\n(7 rows)\n\n\n--- RLS status ---\n    table_name     | rls_enabled | rls_forced \n-------------------+-------------+------------\n notifications     | t           | t\n profile_contacts  | t           | t\n profiles          | t           | t\n residence_members | t           | t\n support_messages  | t           | t\n support_requests  | t           | t\n tenant_members    | t           | t\n(7 rows)\n\n\n--- Policy inventory ---\n schemaname |        tablename         |                      policyname                       |  cmd   \n------------+--------------------------+-------------------------------------------------------+--------\n public     | notifications            | notifications_select_self_policy                      | SELECT\n public     | notifications            | notifications_update_self_policy                      | UPDATE\n public     | profile_contacts         | profile_contacts_select_association_policy            | SELECT\n public     | profile_contacts         | profile_contacts_select_self_policy                   | SELECT\n public     | profile_contacts         | profile_contacts_update_operator_policy               | UPDATE\n public     | profile_contacts         | profile_contacts_update_self_policy                   | UPDATE\n public     | profile_correction_audit | profile_correction_audit_select_platform_admin_policy | SELECT\n public     | profiles                 | profiles_select_association_policy                    | SELECT\n public     | profiles                 | profiles_select_platform_admin_policy                 | SELECT\n public     | profiles                 | profiles_select_self_policy                           | SELECT\n public     | profiles                 | profiles_update_self_policy                           | UPDATE\n public     | residence_members        | residence_members_select_policy                       | SELECT\n public     | support_messages         | support_messages_select_operator_policy               | SELECT\n public     | support_messages         | support_messages_select_platform_admin_policy         | SELECT\n public     | support_messages         | support_messages_select_resident_policy               | SELECT\n public     | support_requests         | support_requests_select_self_policy                   | SELECT\n public     | tenant_members           | tenant_members_select_policy                          | SELECT\n(17 rows)\n\n\n--- DB-01 / DB-02 derived ownership projection ---\nDO\n\n--- DB-03 / DB-04 spoofed ownership ignored ---\nDO\n\n--- DB-05 ownership mutation denied ---\nDO\n\n--- DB-06 parent mismatch projection overwritten ---\nDO\n\n--- DB-07 direct cross-tenant resident read denied ---\nDO\n\n--- DB-08 staff without support permission denied ---\nDO\n\n--- DB-09 authorized staff read allowed ---\nDO\n\n--- DB-10 revoked resident membership denies future reads ---\nDO\n\n--- RT-08 direct read boundary as authenticated resident ---\nDO\n\n--- PR-01 self read ---\nDO\n\n--- PR-02 approved self update ---\nDO\n\n--- PR-03 protected self fields blocked ---\nDO\n\n--- PR-04 cross-profile resident read denied ---\nDO\n\n--- PR-05 authorized association operator ---\nDO\n\n--- PR-06 cross-tenant operator denial ---\nDO\n\n--- PR-07 generic member denial ---\nDO\n\n--- PR-08 unrelated authenticated user denied ---\nDO\n\n--- PR-09 platform admin correction path and audit ---\nDO\n\n--- PR-12 contact records policy checks ---\nDO\n\n--- Performance evidence ---\n                     indexname                     |                                                                             indexdef                                                                              \n---------------------------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------\n idx_notifications_profile_created                 | CREATE INDEX idx_notifications_profile_created ON public.notifications USING btree (profile_id, created_at DESC)\n notifications_pkey                                | CREATE UNIQUE INDEX notifications_pkey ON public.notifications USING btree (id)\n idx_profile_contacts_normalized                   | CREATE INDEX idx_profile_contacts_normalized ON public.profile_contacts USING btree (normalized_value) WHERE (deleted_at IS NULL)\n idx_profile_contacts_profile_active               | CREATE INDEX idx_profile_contacts_profile_active ON public.profile_contacts USING btree (profile_id) WHERE (deleted_at IS NULL)\n profile_contacts_pkey                             | CREATE UNIQUE INDEX profile_contacts_pkey ON public.profile_contacts USING btree (id)\n unique_profile_contact                            | CREATE UNIQUE INDEX unique_profile_contact ON public.profile_contacts USING btree (profile_id, contact_type, normalized_value)\n idx_profiles_user_id                              | CREATE INDEX idx_profiles_user_id ON public.profiles USING btree (user_id)\n profiles_pkey                                     | CREATE UNIQUE INDEX profiles_pkey ON public.profiles USING btree (id)\n profiles_user_id_key                              | CREATE UNIQUE INDEX profiles_user_id_key ON public.profiles USING btree (user_id)\n idx_residence_members_profile_active              | CREATE INDEX idx_residence_members_profile_active ON public.residence_members USING btree (profile_id) WHERE (status = 'active'::text)\n idx_residence_members_property_active             | CREATE INDEX idx_residence_members_property_active ON public.residence_members USING btree (property_id) WHERE (status = 'active'::text)\n residence_members_pkey                            | CREATE UNIQUE INDEX residence_members_pkey ON public.residence_members USING btree (id)\n unique_residence_edge                             | CREATE UNIQUE INDEX unique_residence_edge ON public.residence_members USING btree (property_id, profile_id)\n idx_support_messages_request_created              | CREATE INDEX idx_support_messages_request_created ON public.support_messages USING btree (support_request_id, created_at, id)\n idx_support_messages_resident_user_active_created | CREATE INDEX idx_support_messages_resident_user_active_created ON public.support_messages USING btree (resident_user_id, resident_access_revoked, created_at, id)\n idx_support_messages_tenant_resident_created      | CREATE INDEX idx_support_messages_tenant_resident_created ON public.support_messages USING btree (tenant_id, resident_profile_id, created_at, id)\n support_messages_pkey                             | CREATE UNIQUE INDEX support_messages_pkey ON public.support_messages USING btree (id)\n idx_support_requests_profile                      | CREATE INDEX idx_support_requests_profile ON public.support_requests USING btree (profile_id)\n support_requests_identity_projection              | CREATE UNIQUE INDEX support_requests_identity_projection ON public.support_requests USING btree (id, tenant_id, property_id, profile_id)\n support_requests_pkey                             | CREATE UNIQUE INDEX support_requests_pkey ON public.support_requests USING btree (id)\n idx_tenant_members_lookup                         | CREATE INDEX idx_tenant_members_lookup ON public.tenant_members USING btree (tenant_id, user_id, role) WHERE (status = 'active'::text)\n tenant_members_pkey                               | CREATE UNIQUE INDEX tenant_members_pkey ON public.tenant_members USING btree (id)\n(22 rows)\n\n                                                                     QUERY PLAN                                                                      \n-----------------------------------------------------------------------------------------------------------------------------------------------------\n Index Only Scan using idx_support_messages_tenant_resident_created on support_messages sm\n   Index Cond: ((tenant_id = '11111111-1111-1111-1111-111111111111'::uuid) AND (resident_profile_id = '20000000-0000-0000-0000-000000000001'::uuid))\n(2 rows)\n\n                                          QUERY PLAN                                           \n-----------------------------------------------------------------------------------------------\n Sort\n   Sort Key: created_at, id\n   ->  Bitmap Heap Scan on support_messages sm\n         Recheck Cond: (support_request_id = '70000000-0000-0000-0000-000000000001'::uuid)\n         ->  Bitmap Index Scan on idx_support_messages_request_created\n               Index Cond: (support_request_id = '70000000-0000-0000-0000-000000000001'::uuid)\n(6 rows)\n\n                                                                     QUERY PLAN                                                                      \n-----------------------------------------------------------------------------------------------------------------------------------------------------\n Index Only Scan using idx_support_messages_tenant_resident_created on support_messages sm\n   Index Cond: ((tenant_id = '22222222-2222-2222-2222-222222222222'::uuid) AND (resident_profile_id = '20000000-0000-0000-0000-000000000001'::uuid))\n(2 rows)\n\n\n=== ADR-09 Option B / ADR-10 SQL validation completed ===",
+    "passed": true
+  }
+}
