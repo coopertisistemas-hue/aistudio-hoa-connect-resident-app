@@ -1,32 +1,37 @@
 -- D2 Validation Wave B — isolated local schema setup
 -- Environment: local Supabase CLI project_id aistudio-hoa-connect-resident-app
 -- Safety: local-only, disposable, non-production. Do not run against a hosted project.
+-- Isolation: every table, function, and index created here carries a d2_ prefix and
+-- coexists with the Sprint 1 migration schema without modifying it. This setup is
+-- non-destructive and idempotent: it drops and recreates only d2_-prefixed objects,
+-- so it can run in any order relative to the Sprint 1 suites with no
+-- `supabase db reset` required before or after.
 
 \set ON_ERROR_STOP on
 
-DROP TABLE IF EXISTS public.profile_correction_audit CASCADE;
-DROP TABLE IF EXISTS public.support_messages CASCADE;
-DROP TABLE IF EXISTS public.support_requests CASCADE;
-DROP TABLE IF EXISTS public.notifications CASCADE;
-DROP TABLE IF EXISTS public.residence_members CASCADE;
-DROP TABLE IF EXISTS public.profile_contacts CASCADE;
-DROP TABLE IF EXISTS public.profiles CASCADE;
-DROP TABLE IF EXISTS public.platform_admins CASCADE;
-DROP TABLE IF EXISTS public.tenant_members CASCADE;
-DROP TABLE IF EXISTS public.properties CASCADE;
-DROP TABLE IF EXISTS public.tenants CASCADE;
+DROP TABLE IF EXISTS public.d2_profile_correction_audit CASCADE;
+DROP TABLE IF EXISTS public.d2_support_messages CASCADE;
+DROP TABLE IF EXISTS public.d2_support_requests CASCADE;
+DROP TABLE IF EXISTS public.d2_notifications CASCADE;
+DROP TABLE IF EXISTS public.d2_residence_members CASCADE;
+DROP TABLE IF EXISTS public.d2_profile_contacts CASCADE;
+DROP TABLE IF EXISTS public.d2_profiles CASCADE;
+DROP TABLE IF EXISTS public.d2_platform_admins CASCADE;
+DROP TABLE IF EXISTS public.d2_tenant_members CASCADE;
+DROP TABLE IF EXISTS public.d2_properties CASCADE;
+DROP TABLE IF EXISTS public.d2_tenants CASCADE;
 
-DROP FUNCTION IF EXISTS public.current_profile_id() CASCADE;
-DROP FUNCTION IF EXISTS public.is_platform_admin() CASCADE;
-DROP FUNCTION IF EXISTS public.is_tenant_member(uuid) CASCADE;
-DROP FUNCTION IF EXISTS public.is_authorized_operator(uuid) CASCADE;
-DROP FUNCTION IF EXISTS public.is_support_request_author(uuid) CASCADE;
-DROP FUNCTION IF EXISTS public.is_active_resident_support_participant(uuid, uuid, uuid) CASCADE;
-DROP FUNCTION IF EXISTS public.derive_support_message_ownership() CASCADE;
-DROP FUNCTION IF EXISTS public.enforce_support_message_immutability() CASCADE;
-DROP FUNCTION IF EXISTS public.sync_support_message_resident_access() CASCADE;
-DROP FUNCTION IF EXISTS public.create_support_message(uuid, text, text, uuid, uuid, uuid, uuid, timestamptz) CASCADE;
-DROP FUNCTION IF EXISTS public.apply_profile_correction(uuid, text, text) CASCADE;
+DROP FUNCTION IF EXISTS public.d2_current_profile_id() CASCADE;
+DROP FUNCTION IF EXISTS public.d2_is_platform_admin() CASCADE;
+DROP FUNCTION IF EXISTS public.d2_is_tenant_member(uuid) CASCADE;
+DROP FUNCTION IF EXISTS public.d2_is_authorized_operator(uuid) CASCADE;
+DROP FUNCTION IF EXISTS public.d2_is_support_request_author(uuid) CASCADE;
+DROP FUNCTION IF EXISTS public.d2_is_active_resident_support_participant(uuid, uuid, uuid) CASCADE;
+DROP FUNCTION IF EXISTS public.d2_derive_support_message_ownership() CASCADE;
+DROP FUNCTION IF EXISTS public.d2_enforce_support_message_immutability() CASCADE;
+DROP FUNCTION IF EXISTS public.d2_sync_support_message_resident_access() CASCADE;
+DROP FUNCTION IF EXISTS public.d2_create_support_message(uuid, text, text, uuid, uuid, uuid, uuid, timestamptz) CASCADE;
+DROP FUNCTION IF EXISTS public.d2_apply_profile_correction(uuid, text, text) CASCADE;
 
 DO $$
 BEGIN
@@ -52,20 +57,20 @@ GRANT profile_self_update_test TO postgres;
 GRANT operator_contact_test TO postgres;
 GRANT platform_admin_test TO postgres;
 
-CREATE TABLE public.tenants (
+CREATE TABLE public.d2_tenants (
   id uuid PRIMARY KEY,
   name text NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE TABLE public.properties (
+CREATE TABLE public.d2_properties (
   id uuid PRIMARY KEY,
-  tenant_id uuid NOT NULL REFERENCES public.tenants(id),
+  tenant_id uuid NOT NULL REFERENCES public.d2_tenants(id),
   address text NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE TABLE public.profiles (
+CREATE TABLE public.d2_profiles (
   id uuid PRIMARY KEY,
   user_id uuid NOT NULL UNIQUE,
   full_name text NOT NULL,
@@ -80,9 +85,9 @@ CREATE TABLE public.profiles (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE TABLE public.profile_contacts (
+CREATE TABLE public.d2_profile_contacts (
   id uuid PRIMARY KEY,
-  profile_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  profile_id uuid NOT NULL REFERENCES public.d2_profiles(id) ON DELETE CASCADE,
   contact_type text NOT NULL CHECK (contact_type IN ('phone', 'whatsapp', 'primary_email', 'secondary_email')),
   normalized_value text NOT NULL,
   display_value text NOT NULL,
@@ -98,27 +103,27 @@ CREATE TABLE public.profile_contacts (
   CONSTRAINT unique_profile_contact UNIQUE (profile_id, contact_type, normalized_value)
 );
 
-CREATE TABLE public.tenant_members (
+CREATE TABLE public.d2_tenant_members (
   id uuid PRIMARY KEY,
-  tenant_id uuid NOT NULL REFERENCES public.tenants(id),
+  tenant_id uuid NOT NULL REFERENCES public.d2_tenants(id),
   user_id uuid NOT NULL,
   role text NOT NULL CHECK (role IN ('admin', 'manager', 'operator', 'viewer', 'collector')),
   status text NOT NULL DEFAULT 'active',
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE TABLE public.platform_admins (
+CREATE TABLE public.d2_platform_admins (
   id uuid PRIMARY KEY,
   user_id uuid NOT NULL UNIQUE,
   active boolean NOT NULL DEFAULT true,
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE TABLE public.residence_members (
+CREATE TABLE public.d2_residence_members (
   id uuid PRIMARY KEY,
-  tenant_id uuid NOT NULL REFERENCES public.tenants(id),
-  property_id uuid NOT NULL REFERENCES public.properties(id),
-  profile_id uuid NOT NULL REFERENCES public.profiles(id),
+  tenant_id uuid NOT NULL REFERENCES public.d2_tenants(id),
+  property_id uuid NOT NULL REFERENCES public.d2_properties(id),
+  profile_id uuid NOT NULL REFERENCES public.d2_profiles(id),
   role text NOT NULL CHECK (role IN ('holder', 'financial_responsible', 'authorized_resident', 'dependent', 'representative', 'temporary_guest')),
   status text NOT NULL DEFAULT 'active',
   is_primary boolean NOT NULL DEFAULT false,
@@ -126,10 +131,10 @@ CREATE TABLE public.residence_members (
   CONSTRAINT unique_residence_edge UNIQUE (property_id, profile_id)
 );
 
-CREATE TABLE public.notifications (
+CREATE TABLE public.d2_notifications (
   id uuid PRIMARY KEY,
-  tenant_id uuid NOT NULL REFERENCES public.tenants(id),
-  profile_id uuid NOT NULL REFERENCES public.profiles(id),
+  tenant_id uuid NOT NULL REFERENCES public.d2_tenants(id),
+  profile_id uuid NOT NULL REFERENCES public.d2_profiles(id),
   category text NOT NULL,
   title_key text NOT NULL,
   body_key text NOT NULL,
@@ -138,11 +143,11 @@ CREATE TABLE public.notifications (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE TABLE public.support_requests (
+CREATE TABLE public.d2_support_requests (
   id uuid PRIMARY KEY,
-  tenant_id uuid NOT NULL REFERENCES public.tenants(id),
-  property_id uuid NOT NULL REFERENCES public.properties(id),
-  profile_id uuid NOT NULL REFERENCES public.profiles(id),
+  tenant_id uuid NOT NULL REFERENCES public.d2_tenants(id),
+  property_id uuid NOT NULL REFERENCES public.d2_properties(id),
+  profile_id uuid NOT NULL REFERENCES public.d2_profiles(id),
   protocol text NOT NULL,
   category text NOT NULL,
   status text NOT NULL DEFAULT 'submitted',
@@ -151,31 +156,31 @@ CREATE TABLE public.support_requests (
   CONSTRAINT support_requests_identity_projection UNIQUE (id, tenant_id, property_id, profile_id)
 );
 
-CREATE TABLE public.support_messages (
+CREATE TABLE public.d2_support_messages (
   id uuid PRIMARY KEY,
-  tenant_id uuid NOT NULL REFERENCES public.tenants(id),
-  property_id uuid NOT NULL REFERENCES public.properties(id),
-  resident_profile_id uuid NOT NULL REFERENCES public.profiles(id),
+  tenant_id uuid NOT NULL REFERENCES public.d2_tenants(id),
+  property_id uuid NOT NULL REFERENCES public.d2_properties(id),
+  resident_profile_id uuid NOT NULL REFERENCES public.d2_profiles(id),
   resident_user_id uuid NOT NULL,
   resident_access_revoked boolean NOT NULL DEFAULT false,
   support_request_id uuid NOT NULL,
   delivery_sequence bigint GENERATED ALWAYS AS IDENTITY,
   sender_type text NOT NULL CHECK (sender_type IN ('resident', 'association', 'system')),
-  sender_profile_id uuid REFERENCES public.profiles(id),
+  sender_profile_id uuid REFERENCES public.d2_profiles(id),
   content text NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT support_messages_request_fk
     FOREIGN KEY (support_request_id)
-    REFERENCES public.support_requests(id),
+    REFERENCES public.d2_support_requests(id),
   CONSTRAINT support_messages_identity_projection_fk
     FOREIGN KEY (support_request_id, tenant_id, property_id, resident_profile_id)
-    REFERENCES public.support_requests(id, tenant_id, property_id, profile_id)
+    REFERENCES public.d2_support_requests(id, tenant_id, property_id, profile_id)
 );
 
-CREATE TABLE public.profile_correction_audit (
+CREATE TABLE public.d2_profile_correction_audit (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   actor_user_id uuid NOT NULL,
-  target_profile_id uuid NOT NULL REFERENCES public.profiles(id),
+  target_profile_id uuid NOT NULL REFERENCES public.d2_profiles(id),
   field_name text NOT NULL,
   old_value text NOT NULL,
   new_value text NOT NULL,
@@ -183,7 +188,7 @@ CREATE TABLE public.profile_correction_audit (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE OR REPLACE FUNCTION public.current_profile_id()
+CREATE OR REPLACE FUNCTION public.d2_current_profile_id()
 RETURNS uuid
 LANGUAGE sql
 STABLE
@@ -191,11 +196,11 @@ SECURITY DEFINER
 SET search_path = ''
 AS $$
   SELECT p.id
-  FROM public.profiles AS p
+  FROM public.d2_profiles AS p
   WHERE p.user_id = auth.uid();
 $$;
 
-CREATE OR REPLACE FUNCTION public.is_platform_admin()
+CREATE OR REPLACE FUNCTION public.d2_is_platform_admin()
 RETURNS boolean
 LANGUAGE sql
 STABLE
@@ -204,13 +209,13 @@ SET search_path = ''
 AS $$
   SELECT EXISTS (
     SELECT 1
-    FROM public.platform_admins AS pa
+    FROM public.d2_platform_admins AS pa
     WHERE pa.user_id = auth.uid()
       AND pa.active = true
   );
 $$;
 
-CREATE OR REPLACE FUNCTION public.is_tenant_member(target_tenant_id uuid)
+CREATE OR REPLACE FUNCTION public.d2_is_tenant_member(target_tenant_id uuid)
 RETURNS boolean
 LANGUAGE sql
 STABLE
@@ -219,14 +224,14 @@ SET search_path = ''
 AS $$
   SELECT EXISTS (
     SELECT 1
-    FROM public.tenant_members AS tm
+    FROM public.d2_tenant_members AS tm
     WHERE tm.tenant_id = target_tenant_id
       AND tm.user_id = auth.uid()
       AND tm.status = 'active'
   );
 $$;
 
-CREATE OR REPLACE FUNCTION public.is_authorized_operator(target_tenant_id uuid)
+CREATE OR REPLACE FUNCTION public.d2_is_authorized_operator(target_tenant_id uuid)
 RETURNS boolean
 LANGUAGE sql
 STABLE
@@ -235,7 +240,7 @@ SET search_path = ''
 AS $$
   SELECT EXISTS (
     SELECT 1
-    FROM public.tenant_members AS tm
+    FROM public.d2_tenant_members AS tm
     WHERE tm.tenant_id = target_tenant_id
       AND tm.user_id = auth.uid()
       AND tm.status = 'active'
@@ -243,7 +248,7 @@ AS $$
   );
 $$;
 
-CREATE OR REPLACE FUNCTION public.is_support_request_author(target_request_id uuid)
+CREATE OR REPLACE FUNCTION public.d2_is_support_request_author(target_request_id uuid)
 RETURNS boolean
 LANGUAGE sql
 STABLE
@@ -252,13 +257,13 @@ SET search_path = ''
 AS $$
   SELECT EXISTS (
     SELECT 1
-    FROM public.support_requests AS sr
+    FROM public.d2_support_requests AS sr
     WHERE sr.id = target_request_id
-      AND sr.profile_id = public.current_profile_id()
+      AND sr.profile_id = public.d2_current_profile_id()
   );
 $$;
 
-CREATE OR REPLACE FUNCTION public.is_active_resident_support_participant(
+CREATE OR REPLACE FUNCTION public.d2_is_active_resident_support_participant(
   target_tenant_id uuid,
   target_property_id uuid,
   target_profile_id uuid
@@ -271,7 +276,7 @@ SET search_path = ''
 AS $$
   SELECT EXISTS (
     SELECT 1
-    FROM public.residence_members AS rm
+    FROM public.d2_residence_members AS rm
     WHERE rm.tenant_id = target_tenant_id
       AND rm.property_id = target_property_id
       AND rm.profile_id = target_profile_id
@@ -279,19 +284,19 @@ AS $$
   );
 $$;
 
-CREATE OR REPLACE FUNCTION public.derive_support_message_ownership()
+CREATE OR REPLACE FUNCTION public.d2_derive_support_message_ownership()
 RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
 AS $$
 DECLARE
-  parent_request public.support_requests%ROWTYPE;
+  parent_request public.d2_support_requests%ROWTYPE;
   resident_user uuid;
 BEGIN
   SELECT *
   INTO parent_request
-  FROM public.support_requests
+  FROM public.d2_support_requests
   WHERE id = NEW.support_request_id;
 
   IF parent_request.id IS NULL THEN
@@ -303,7 +308,7 @@ BEGIN
   NEW.resident_profile_id := parent_request.profile_id;
   SELECT p.user_id
   INTO resident_user
-  FROM public.profiles AS p
+  FROM public.d2_profiles AS p
   WHERE p.id = parent_request.profile_id;
 
   IF resident_user IS NULL THEN
@@ -311,7 +316,7 @@ BEGIN
   END IF;
 
   NEW.resident_user_id := resident_user;
-  NEW.resident_access_revoked := NOT public.is_active_resident_support_participant(
+  NEW.resident_access_revoked := NOT public.d2_is_active_resident_support_participant(
     parent_request.tenant_id,
     parent_request.property_id,
     parent_request.profile_id
@@ -321,7 +326,7 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION public.enforce_support_message_immutability()
+CREATE OR REPLACE FUNCTION public.d2_enforce_support_message_immutability()
 RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -352,14 +357,14 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION public.sync_support_message_resident_access()
+CREATE OR REPLACE FUNCTION public.d2_sync_support_message_resident_access()
 RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
 AS $$
 BEGIN
-  UPDATE public.support_messages
+  UPDATE public.d2_support_messages
   SET resident_access_revoked = (NEW.status <> 'active')
   WHERE tenant_id = NEW.tenant_id
     AND property_id = NEW.property_id
@@ -369,7 +374,7 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION public.create_support_message(
+CREATE OR REPLACE FUNCTION public.d2_create_support_message(
   target_support_request_id uuid,
   target_content text,
   target_sender_type text DEFAULT 'resident',
@@ -379,18 +384,18 @@ CREATE OR REPLACE FUNCTION public.create_support_message(
   requested_property_id uuid DEFAULT NULL,
   target_created_at timestamptz DEFAULT now()
 )
-RETURNS public.support_messages
+RETURNS public.d2_support_messages
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
 AS $$
 DECLARE
-  parent_request public.support_requests%ROWTYPE;
-  inserted_row public.support_messages%ROWTYPE;
+  parent_request public.d2_support_requests%ROWTYPE;
+  inserted_row public.d2_support_messages%ROWTYPE;
 BEGIN
   SELECT *
   INTO parent_request
-  FROM public.support_requests
+  FROM public.d2_support_requests
   WHERE id = target_support_request_id;
 
   IF parent_request.id IS NULL THEN
@@ -398,26 +403,26 @@ BEGIN
   END IF;
 
   IF target_sender_type = 'resident' THEN
-    IF parent_request.profile_id <> public.current_profile_id() THEN
+    IF parent_request.profile_id <> public.d2_current_profile_id() THEN
       RAISE EXCEPTION 'resident support request access denied';
     END IF;
 
-    IF NOT public.is_active_resident_support_participant(parent_request.tenant_id, parent_request.property_id, parent_request.profile_id) THEN
+    IF NOT public.d2_is_active_resident_support_participant(parent_request.tenant_id, parent_request.property_id, parent_request.profile_id) THEN
       RAISE EXCEPTION 'resident support request relationship inactive';
     END IF;
   ELSIF target_sender_type = 'association' THEN
-    IF NOT (public.is_authorized_operator(parent_request.tenant_id) OR public.is_platform_admin()) THEN
+    IF NOT (public.d2_is_authorized_operator(parent_request.tenant_id) OR public.d2_is_platform_admin()) THEN
       RAISE EXCEPTION 'operator support request access denied';
     END IF;
   ELSIF target_sender_type = 'system' THEN
-    IF NOT public.is_platform_admin() THEN
+    IF NOT public.d2_is_platform_admin() THEN
       RAISE EXCEPTION 'system support message access denied';
     END IF;
   ELSE
     RAISE EXCEPTION 'unsupported sender_type %', target_sender_type;
   END IF;
 
-  INSERT INTO public.support_messages (
+  INSERT INTO public.d2_support_messages (
     id,
     tenant_id,
     property_id,
@@ -445,7 +450,7 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION public.apply_profile_correction(
+CREATE OR REPLACE FUNCTION public.d2_apply_profile_correction(
   target_profile_id uuid,
   replacement_document text,
   audit_reason text
@@ -459,25 +464,25 @@ DECLARE
   previous_document text;
   audit_id uuid;
 BEGIN
-  IF NOT public.is_platform_admin() THEN
+  IF NOT public.d2_is_platform_admin() THEN
     RAISE EXCEPTION 'platform admin required';
   END IF;
 
   SELECT p.document
   INTO previous_document
-  FROM public.profiles AS p
+  FROM public.d2_profiles AS p
   WHERE p.id = target_profile_id;
 
   IF previous_document IS NULL THEN
     RAISE EXCEPTION 'target profile not found';
   END IF;
 
-  UPDATE public.profiles
+  UPDATE public.d2_profiles
   SET document = replacement_document,
       updated_at = now()
   WHERE id = target_profile_id;
 
-  INSERT INTO public.profile_correction_audit (
+  INSERT INTO public.d2_profile_correction_audit (
     actor_user_id,
     target_profile_id,
     field_name,
@@ -499,100 +504,100 @@ BEGIN
 END;
 $$;
 
-CREATE INDEX idx_properties_tenant ON public.properties(tenant_id);
-CREATE INDEX idx_profiles_user_id ON public.profiles(user_id);
-CREATE INDEX idx_profile_contacts_profile_active ON public.profile_contacts(profile_id) WHERE deleted_at IS NULL;
-CREATE INDEX idx_profile_contacts_normalized ON public.profile_contacts(normalized_value) WHERE deleted_at IS NULL;
-CREATE INDEX idx_tenant_members_lookup ON public.tenant_members(tenant_id, user_id, role) WHERE status = 'active';
-CREATE INDEX idx_platform_admins_lookup ON public.platform_admins(user_id) WHERE active = true;
-CREATE INDEX idx_residence_members_profile_active ON public.residence_members(profile_id) WHERE status = 'active';
-CREATE INDEX idx_residence_members_property_active ON public.residence_members(property_id) WHERE status = 'active';
-CREATE INDEX idx_notifications_profile_created ON public.notifications(profile_id, created_at DESC);
-CREATE INDEX idx_support_requests_profile ON public.support_requests(profile_id);
-CREATE INDEX idx_support_messages_tenant_resident_created ON public.support_messages(tenant_id, resident_profile_id, created_at, id);
-CREATE INDEX idx_support_messages_resident_user_active_created ON public.support_messages(resident_user_id, resident_access_revoked, created_at, id);
-CREATE INDEX idx_support_messages_request_created ON public.support_messages(support_request_id, created_at, id);
+CREATE INDEX d2_idx_properties_tenant ON public.d2_properties(tenant_id);
+CREATE INDEX d2_idx_profiles_user_id ON public.d2_profiles(user_id);
+CREATE INDEX d2_idx_profile_contacts_profile_active ON public.d2_profile_contacts(profile_id) WHERE deleted_at IS NULL;
+CREATE INDEX d2_idx_profile_contacts_normalized ON public.d2_profile_contacts(normalized_value) WHERE deleted_at IS NULL;
+CREATE INDEX d2_idx_tenant_members_lookup ON public.d2_tenant_members(tenant_id, user_id, role) WHERE status = 'active';
+CREATE INDEX d2_idx_platform_admins_lookup ON public.d2_platform_admins(user_id) WHERE active = true;
+CREATE INDEX d2_idx_residence_members_profile_active ON public.d2_residence_members(profile_id) WHERE status = 'active';
+CREATE INDEX d2_idx_residence_members_property_active ON public.d2_residence_members(property_id) WHERE status = 'active';
+CREATE INDEX d2_idx_notifications_profile_created ON public.d2_notifications(profile_id, created_at DESC);
+CREATE INDEX d2_idx_support_requests_profile ON public.d2_support_requests(profile_id);
+CREATE INDEX d2_idx_support_messages_tenant_resident_created ON public.d2_support_messages(tenant_id, resident_profile_id, created_at, id);
+CREATE INDEX d2_idx_support_messages_resident_user_active_created ON public.d2_support_messages(resident_user_id, resident_access_revoked, created_at, id);
+CREATE INDEX d2_idx_support_messages_request_created ON public.d2_support_messages(support_request_id, created_at, id);
 
-ALTER TABLE public.tenants ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.properties ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.profile_contacts ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.tenant_members ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.platform_admins ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.residence_members ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.support_requests ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.support_messages ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.profile_correction_audit ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.d2_tenants ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.d2_properties ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.d2_profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.d2_profile_contacts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.d2_tenant_members ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.d2_platform_admins ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.d2_residence_members ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.d2_notifications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.d2_support_requests ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.d2_support_messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.d2_profile_correction_audit ENABLE ROW LEVEL SECURITY;
 
-ALTER TABLE public.tenants FORCE ROW LEVEL SECURITY;
-ALTER TABLE public.properties FORCE ROW LEVEL SECURITY;
-ALTER TABLE public.profiles FORCE ROW LEVEL SECURITY;
-ALTER TABLE public.profile_contacts FORCE ROW LEVEL SECURITY;
-ALTER TABLE public.tenant_members FORCE ROW LEVEL SECURITY;
-ALTER TABLE public.platform_admins FORCE ROW LEVEL SECURITY;
-ALTER TABLE public.residence_members FORCE ROW LEVEL SECURITY;
-ALTER TABLE public.notifications FORCE ROW LEVEL SECURITY;
-ALTER TABLE public.support_requests FORCE ROW LEVEL SECURITY;
-ALTER TABLE public.support_messages FORCE ROW LEVEL SECURITY;
-ALTER TABLE public.profile_correction_audit FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.d2_tenants FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.d2_properties FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.d2_profiles FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.d2_profile_contacts FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.d2_tenant_members FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.d2_platform_admins FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.d2_residence_members FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.d2_notifications FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.d2_support_requests FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.d2_support_messages FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.d2_profile_correction_audit FORCE ROW LEVEL SECURITY;
 
 CREATE POLICY tenants_select_policy
-ON public.tenants
+ON public.d2_tenants
 FOR SELECT
-USING (public.is_tenant_member(id) OR public.is_platform_admin());
+USING (public.d2_is_tenant_member(id) OR public.d2_is_platform_admin());
 
 CREATE POLICY properties_select_policy
-ON public.properties
+ON public.d2_properties
 FOR SELECT
 USING (
-  public.is_tenant_member(tenant_id)
+  public.d2_is_tenant_member(tenant_id)
   OR EXISTS (
     SELECT 1
-    FROM public.residence_members AS rm
-    WHERE rm.property_id = properties.id
-      AND rm.profile_id = public.current_profile_id()
+    FROM public.d2_residence_members AS rm
+    WHERE rm.property_id = d2_properties.id
+      AND rm.profile_id = public.d2_current_profile_id()
       AND rm.status = 'active'
   )
-  OR public.is_platform_admin()
+  OR public.d2_is_platform_admin()
 );
 
 CREATE POLICY tenant_members_select_policy
-ON public.tenant_members
+ON public.d2_tenant_members
 FOR SELECT
-USING (user_id = auth.uid() OR public.is_platform_admin());
+USING (user_id = auth.uid() OR public.d2_is_platform_admin());
 
 CREATE POLICY platform_admins_select_policy
-ON public.platform_admins
+ON public.d2_platform_admins
 FOR SELECT
-USING (user_id = auth.uid() OR public.is_platform_admin());
+USING (user_id = auth.uid() OR public.d2_is_platform_admin());
 
 CREATE POLICY residence_members_select_policy
-ON public.residence_members
+ON public.d2_residence_members
 FOR SELECT
 USING (
-  profile_id = public.current_profile_id()
-  OR public.is_authorized_operator(tenant_id)
-  OR public.is_platform_admin()
+  profile_id = public.d2_current_profile_id()
+  OR public.d2_is_authorized_operator(tenant_id)
+  OR public.d2_is_platform_admin()
 );
 
 CREATE POLICY profiles_select_self_policy
-ON public.profiles
+ON public.d2_profiles
 FOR SELECT
 USING (user_id = auth.uid());
 
 CREATE POLICY profiles_select_association_policy
-ON public.profiles
+ON public.d2_profiles
 FOR SELECT
 USING (
   EXISTS (
     SELECT 1
-    FROM public.residence_members AS rm
-    JOIN public.properties AS p
+    FROM public.d2_residence_members AS rm
+    JOIN public.d2_properties AS p
       ON p.id = rm.property_id
-    JOIN public.tenant_members AS tm
+    JOIN public.d2_tenant_members AS tm
       ON tm.tenant_id = p.tenant_id
-    WHERE rm.profile_id = profiles.id
+    WHERE rm.profile_id = d2_profiles.id
       AND rm.status = 'active'
       AND tm.user_id = auth.uid()
       AND tm.status = 'active'
@@ -601,59 +606,59 @@ USING (
 );
 
 CREATE POLICY profiles_select_platform_admin_policy
-ON public.profiles
+ON public.d2_profiles
 FOR SELECT
-USING (public.is_platform_admin());
+USING (public.d2_is_platform_admin());
 
 CREATE POLICY profiles_update_self_policy
-ON public.profiles
+ON public.d2_profiles
 FOR UPDATE
 USING (user_id = auth.uid())
 WITH CHECK (user_id = auth.uid());
 
 CREATE POLICY profile_contacts_select_self_policy
-ON public.profile_contacts
+ON public.d2_profile_contacts
 FOR SELECT
-USING (profile_id = public.current_profile_id());
+USING (profile_id = public.d2_current_profile_id());
 
 CREATE POLICY profile_contacts_select_association_policy
-ON public.profile_contacts
+ON public.d2_profile_contacts
 FOR SELECT
 USING (
   EXISTS (
     SELECT 1
-    FROM public.residence_members AS rm
-    JOIN public.properties AS p
+    FROM public.d2_residence_members AS rm
+    JOIN public.d2_properties AS p
       ON p.id = rm.property_id
-    JOIN public.tenant_members AS tm
+    JOIN public.d2_tenant_members AS tm
       ON tm.tenant_id = p.tenant_id
-    WHERE rm.profile_id = profile_contacts.profile_id
+    WHERE rm.profile_id = d2_profile_contacts.profile_id
       AND rm.status = 'active'
       AND tm.user_id = auth.uid()
       AND tm.status = 'active'
       AND tm.role IN ('admin', 'manager', 'operator')
   )
-  OR public.is_platform_admin()
+  OR public.d2_is_platform_admin()
 );
 
 CREATE POLICY profile_contacts_update_self_policy
-ON public.profile_contacts
+ON public.d2_profile_contacts
 FOR UPDATE
-USING (profile_id = public.current_profile_id())
-WITH CHECK (profile_id = public.current_profile_id());
+USING (profile_id = public.d2_current_profile_id())
+WITH CHECK (profile_id = public.d2_current_profile_id());
 
 CREATE POLICY profile_contacts_update_operator_policy
-ON public.profile_contacts
+ON public.d2_profile_contacts
 FOR UPDATE
 USING (
   EXISTS (
     SELECT 1
-    FROM public.residence_members AS rm
-    JOIN public.properties AS p
+    FROM public.d2_residence_members AS rm
+    JOIN public.d2_properties AS p
       ON p.id = rm.property_id
-    JOIN public.tenant_members AS tm
+    JOIN public.d2_tenant_members AS tm
       ON tm.tenant_id = p.tenant_id
-    WHERE rm.profile_id = profile_contacts.profile_id
+    WHERE rm.profile_id = d2_profile_contacts.profile_id
       AND rm.status = 'active'
       AND tm.user_id = auth.uid()
       AND tm.status = 'active'
@@ -663,12 +668,12 @@ USING (
 WITH CHECK (
   EXISTS (
     SELECT 1
-    FROM public.residence_members AS rm
-    JOIN public.properties AS p
+    FROM public.d2_residence_members AS rm
+    JOIN public.d2_properties AS p
       ON p.id = rm.property_id
-    JOIN public.tenant_members AS tm
+    JOIN public.d2_tenant_members AS tm
       ON tm.tenant_id = p.tenant_id
-    WHERE rm.profile_id = profile_contacts.profile_id
+    WHERE rm.profile_id = d2_profile_contacts.profile_id
       AND rm.status = 'active'
       AND tm.user_id = auth.uid()
       AND tm.status = 'active'
@@ -677,23 +682,23 @@ WITH CHECK (
 );
 
 CREATE POLICY notifications_select_self_policy
-ON public.notifications
+ON public.d2_notifications
 FOR SELECT
-USING (profile_id = public.current_profile_id());
+USING (profile_id = public.d2_current_profile_id());
 
 CREATE POLICY notifications_update_self_policy
-ON public.notifications
+ON public.d2_notifications
 FOR UPDATE
-USING (profile_id = public.current_profile_id())
-WITH CHECK (profile_id = public.current_profile_id());
+USING (profile_id = public.d2_current_profile_id())
+WITH CHECK (profile_id = public.d2_current_profile_id());
 
 CREATE POLICY support_requests_select_self_policy
-ON public.support_requests
+ON public.d2_support_requests
 FOR SELECT
-USING (profile_id = public.current_profile_id());
+USING (profile_id = public.d2_current_profile_id());
 
 CREATE POLICY support_messages_select_resident_policy
-ON public.support_messages
+ON public.d2_support_messages
 FOR SELECT
 TO authenticated
 USING (
@@ -702,21 +707,21 @@ USING (
 );
 
 CREATE POLICY support_messages_select_operator_policy
-ON public.support_messages
+ON public.d2_support_messages
 FOR SELECT
 TO authenticated
-USING (public.is_authorized_operator(tenant_id));
+USING (public.d2_is_authorized_operator(tenant_id));
 
 CREATE POLICY support_messages_select_platform_admin_policy
-ON public.support_messages
+ON public.d2_support_messages
 FOR SELECT
 TO authenticated
-USING (public.is_platform_admin());
+USING (public.d2_is_platform_admin());
 
 CREATE POLICY profile_correction_audit_select_platform_admin_policy
-ON public.profile_correction_audit
+ON public.d2_profile_correction_audit
 FOR SELECT
-USING (public.is_platform_admin());
+USING (public.d2_is_platform_admin());
 
 DO $$
 BEGIN
@@ -725,9 +730,9 @@ BEGIN
     FROM pg_publication_tables
     WHERE pubname = 'supabase_realtime'
       AND schemaname = 'public'
-      AND tablename = 'notifications'
+      AND tablename = 'd2_notifications'
   ) THEN
-    EXECUTE 'ALTER PUBLICATION supabase_realtime DROP TABLE public.notifications';
+    EXECUTE 'ALTER PUBLICATION supabase_realtime DROP TABLE public.d2_notifications';
   END IF;
 
   IF EXISTS (
@@ -735,67 +740,68 @@ BEGIN
     FROM pg_publication_tables
     WHERE pubname = 'supabase_realtime'
       AND schemaname = 'public'
-      AND tablename = 'support_messages'
+      AND tablename = 'd2_support_messages'
   ) THEN
-    EXECUTE 'ALTER PUBLICATION supabase_realtime DROP TABLE public.support_messages';
+    EXECUTE 'ALTER PUBLICATION supabase_realtime DROP TABLE public.d2_support_messages';
   END IF;
 END $$;
 
-ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications, public.support_messages;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.d2_notifications, public.d2_support_messages;
 
 CREATE TRIGGER derive_support_message_ownership_before_insert
-BEFORE INSERT ON public.support_messages
+BEFORE INSERT ON public.d2_support_messages
 FOR EACH ROW
-EXECUTE FUNCTION public.derive_support_message_ownership();
+EXECUTE FUNCTION public.d2_derive_support_message_ownership();
 
 CREATE TRIGGER enforce_support_message_immutability_before_update
-BEFORE UPDATE ON public.support_messages
+BEFORE UPDATE ON public.d2_support_messages
 FOR EACH ROW
-EXECUTE FUNCTION public.enforce_support_message_immutability();
+EXECUTE FUNCTION public.d2_enforce_support_message_immutability();
 
 CREATE TRIGGER sync_support_message_resident_access_after_membership_change
-AFTER UPDATE OF status ON public.residence_members
+AFTER UPDATE OF status ON public.d2_residence_members
 FOR EACH ROW
-EXECUTE FUNCTION public.sync_support_message_resident_access();
+EXECUTE FUNCTION public.d2_sync_support_message_resident_access();
 
-REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon, authenticated;
-REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM anon, authenticated;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES FROM anon, authenticated;
+REVOKE ALL ON public.d2_tenants, public.d2_properties, public.d2_profiles, public.d2_profile_contacts,
+  public.d2_tenant_members, public.d2_platform_admins, public.d2_residence_members, public.d2_notifications,
+  public.d2_support_requests, public.d2_support_messages, public.d2_profile_correction_audit
+FROM anon, authenticated;
 
 GRANT USAGE ON SCHEMA public TO anon, authenticated;
-GRANT SELECT ON public.notifications TO authenticated;
-GRANT SELECT ON public.support_messages TO authenticated;
-GRANT EXECUTE ON FUNCTION public.create_support_message(uuid, text, text, uuid, uuid, uuid, uuid, timestamptz) TO authenticated;
+GRANT SELECT ON public.d2_notifications TO authenticated;
+GRANT SELECT ON public.d2_support_messages TO authenticated;
+GRANT EXECUTE ON FUNCTION public.d2_create_support_message(uuid, text, text, uuid, uuid, uuid, uuid, timestamptz) TO authenticated;
 
 GRANT USAGE ON SCHEMA public TO profile_read_test, profile_self_update_test, operator_contact_test, platform_admin_test;
 
-GRANT SELECT ON public.tenants, public.properties, public.profiles, public.profile_contacts,
-  public.tenant_members, public.platform_admins, public.residence_members, public.profile_correction_audit, public.support_messages
+GRANT SELECT ON public.d2_tenants, public.d2_properties, public.d2_profiles, public.d2_profile_contacts,
+  public.d2_tenant_members, public.d2_platform_admins, public.d2_residence_members, public.d2_profile_correction_audit, public.d2_support_messages
 TO profile_read_test, profile_self_update_test, operator_contact_test, platform_admin_test;
 
 GRANT USAGE ON SCHEMA auth TO profile_read_test, profile_self_update_test, operator_contact_test, platform_admin_test;
 GRANT EXECUTE ON FUNCTION auth.uid() TO profile_read_test, profile_self_update_test, operator_contact_test, platform_admin_test;
 
 GRANT UPDATE (preferred_name, display_name, pronoun_preference, photo_path)
-ON public.profiles TO profile_self_update_test;
+ON public.d2_profiles TO profile_self_update_test;
 
 GRANT UPDATE (display_value, communication_preference_flags)
-ON public.profile_contacts TO profile_self_update_test;
+ON public.d2_profile_contacts TO profile_self_update_test;
 
 GRANT UPDATE (verification_state, verified_at, invalidated_at, outdated_at)
-ON public.profile_contacts TO operator_contact_test;
+ON public.d2_profile_contacts TO operator_contact_test;
 
-GRANT EXECUTE ON FUNCTION public.apply_profile_correction(uuid, text, text) TO platform_admin_test;
+GRANT EXECUTE ON FUNCTION public.d2_apply_profile_correction(uuid, text, text) TO platform_admin_test;
 
-INSERT INTO public.tenants (id, name) VALUES
+INSERT INTO public.d2_tenants (id, name) VALUES
   ('11111111-1111-1111-1111-111111111111', 'Tenant A'),
   ('22222222-2222-2222-2222-222222222222', 'Tenant B');
 
-INSERT INTO public.properties (id, tenant_id, address) VALUES
+INSERT INTO public.d2_properties (id, tenant_id, address) VALUES
   ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '11111111-1111-1111-1111-111111111111', 'Tenant A Residence'),
   ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '22222222-2222-2222-2222-222222222222', 'Tenant B Residence');
 
-INSERT INTO public.profiles (id, user_id, full_name, preferred_name, display_name, pronoun_preference, document, birth_date, photo_path) VALUES
+INSERT INTO public.d2_profiles (id, user_id, full_name, preferred_name, display_name, pronoun_preference, document, birth_date, photo_path) VALUES
   ('20000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', 'Resident A', 'Ana', 'Ana A', 'ela/dela', 'CPF-A', '1990-01-01', 'profiles/a.jpg'),
   ('20000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000002', 'Resident B', 'Bruno', 'Bruno B', 'ele/dele', 'CPF-B', '1991-02-02', 'profiles/b.jpg'),
   ('20000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000003', 'Unrelated Auth', 'Caio', 'Caio U', 'ele/dele', 'CPF-U', '1992-03-03', 'profiles/u.jpg'),
@@ -804,25 +810,25 @@ INSERT INTO public.profiles (id, user_id, full_name, preferred_name, display_nam
   ('20000000-0000-0000-0000-000000000006', '10000000-0000-0000-0000-000000000006', 'Platform Admin', 'Paula', 'Platform Admin', 'ela/dela', 'CPF-PA', '1980-06-06', 'profiles/pa.jpg'),
   ('20000000-0000-0000-0000-000000000007', '10000000-0000-0000-0000-000000000007', 'Generic Member A', 'Gabi', 'Generic Member A', 'ela/dela', 'CPF-GA', '1988-07-07', 'profiles/ga.jpg');
 
-INSERT INTO public.residence_members (id, tenant_id, property_id, profile_id, role, status, is_primary) VALUES
+INSERT INTO public.d2_residence_members (id, tenant_id, property_id, profile_id, role, status, is_primary) VALUES
   ('30000000-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '20000000-0000-0000-0000-000000000001', 'holder', 'active', true),
   ('30000000-0000-0000-0000-000000000002', '22222222-2222-2222-2222-222222222222', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '20000000-0000-0000-0000-000000000002', 'holder', 'active', true);
 
-INSERT INTO public.tenant_members (id, tenant_id, user_id, role, status) VALUES
+INSERT INTO public.d2_tenant_members (id, tenant_id, user_id, role, status) VALUES
   ('40000000-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111', '10000000-0000-0000-0000-000000000004', 'operator', 'active'),
   ('40000000-0000-0000-0000-000000000002', '22222222-2222-2222-2222-222222222222', '10000000-0000-0000-0000-000000000005', 'operator', 'active'),
   ('40000000-0000-0000-0000-000000000003', '11111111-1111-1111-1111-111111111111', '10000000-0000-0000-0000-000000000007', 'viewer', 'active');
 
-INSERT INTO public.platform_admins (id, user_id, active) VALUES
+INSERT INTO public.d2_platform_admins (id, user_id, active) VALUES
   ('50000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000006', true);
 
-INSERT INTO public.profile_contacts (id, profile_id, contact_type, normalized_value, display_value, verification_state, communication_preference_flags) VALUES
+INSERT INTO public.d2_profile_contacts (id, profile_id, contact_type, normalized_value, display_value, verification_state, communication_preference_flags) VALUES
   ('60000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000001', 'primary_email', 'resident.a@example.com', 'resident.a@example.com', 'verified', '{"invoiceDelivery":"email"}'),
   ('60000000-0000-0000-0000-000000000002', '20000000-0000-0000-0000-000000000002', 'primary_email', 'resident.b@example.com', 'resident.b@example.com', 'pending', '{"invoiceDelivery":"whatsapp"}');
 
-INSERT INTO public.support_requests (id, tenant_id, property_id, profile_id, protocol, category, subject) VALUES
+INSERT INTO public.d2_support_requests (id, tenant_id, property_id, profile_id, protocol, category, subject) VALUES
   ('70000000-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '20000000-0000-0000-0000-000000000001', 'SUP-A-001', 'other', 'Support request A'),
   ('70000000-0000-0000-0000-000000000002', '22222222-2222-2222-2222-222222222222', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '20000000-0000-0000-0000-000000000002', 'SUP-B-001', 'other', 'Support request B');
 
-INSERT INTO public.support_messages (id, support_request_id, sender_type, sender_profile_id, content, created_at) VALUES
+INSERT INTO public.d2_support_messages (id, support_request_id, sender_type, sender_profile_id, content, created_at) VALUES
   ('80000000-0000-0000-0000-000000000001', '70000000-0000-0000-0000-000000000001', 'resident', '20000000-0000-0000-0000-000000000001', 'Initial message A', '2026-07-19T09:00:00Z');
