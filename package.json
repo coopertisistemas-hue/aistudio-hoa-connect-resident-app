@@ -16,7 +16,7 @@
     "supabase:reset": "supabase db reset",
     "supabase:test:sprint1": "bash -lc 'docker exec -i supabase_db_aistudio-hoa-connect-resident-app psql -U postgres -d postgres < supabase/tests/sprint01_foundation.sql'",
     "supabase:test:d2": "bash validation/run_d2_regression.sh",
-    "supabase:test:all": "npm run supabase:test:sprint1 && npm run supabase:test:d2",
+    "supabase:test:all": "npm run supabase:test:sprint1 && npm run supabase:test:edge-func-auth && npm run supabase:test:d2 && npm run supabase:reset && npm run supabase:test:sprint1",
     "supabase:test:edge-func-auth": "bash -lc 'docker exec -i supabase_db_aistudio-hoa-connect-resident-app psql -U postgres -d postgres < supabase/tests/sprint01_edge_function_fixtures.sql' && node supabase/tests/sprint01_edge_function_auth.test.mjs",
     "supabase:perf:seed": "bash -lc 'docker exec -i supabase_db_aistudio-hoa-connect-resident-app psql -U postgres -d postgres < supabase/tests/sprint01_performance_seed.sql'",
     "supabase:perf:explain": "bash -lc 'docker exec -i supabase_db_aistudio-hoa-connect-resident-app psql -U postgres -d postgres < supabase/tests/sprint01_performance_explain.sql'",

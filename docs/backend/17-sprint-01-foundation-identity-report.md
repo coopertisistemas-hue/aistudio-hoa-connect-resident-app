@@ -415,16 +415,26 @@ Representative dataset seeded (50 tenants, 501 properties, 3,253 profiles, 3,001
 
 Evidence: `validation/evidence/sprint01_identity_explain_evidence.md`, `validation/evidence/sprint01_identity_explain_summary.json`
 
-### Updated Verdict
+### Updated Verdict (superseded by independent audit chain)
+
+The three original conditions are **CLOSED** after re-execution (see report 18).  
+Independent audits and Agy governance (reports 19–21) retain:
 
 ```text
-SPRINT 1 PASS — FOUNDATION CERTIFIED
+SPRINT 1 PASS WITH CONDITIONS — FOUNDATION USABLE
 ```
 
-Full closure report: `docs/backend/18-sprint-01-conditions-closure-report.md`
+Residual condition: D2 validation setup remains destructive to the Sprint 1 schema and must run in the documented order (`COND-OPS-01` in report 21). Full `FOUNDATION CERTIFIED` is withheld until that operational gap is closed.
+
+Full closure / audit chain:
+
+- `docs/backend/18-sprint-01-conditions-closure-report.md`
+- `docs/backend/19-sprint-01-opencode-go-technical-audit.md`
+- `docs/backend/20-sprint-01-claude-independent-audit.md`
+- `docs/backend/21-sprint-01-final-certification.md`
 
 ### Next Authorized Action
 
 ```text
-Begin Sprint 2 — Resident, Residence and Association Domain.
+Sprint 2 may be planned but must not be implemented until product authorizes the next wave.
 ```

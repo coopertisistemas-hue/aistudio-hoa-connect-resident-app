@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# WARNING: validation/d2_setup.sql DROPs and recreates foundation tables with the
+# D2-shaped schema. This intentionally replaces the Sprint 1 migration schema.
+# After this suite, run `npm run supabase:reset` before Sprint 1 SQL/edge/perf tests.
+# Do not interleave D2 setup with Sprint 1 edge-function authorization tests.
+
 docker exec -i supabase_db_aistudio-hoa-connect-resident-app \
   psql -U postgres -d postgres < validation/d2_setup.sql
 

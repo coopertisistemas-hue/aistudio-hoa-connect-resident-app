@@ -1,35 +1,36 @@
 {
-  "generatedAt": "2026-07-19T16:27:44.024Z",
+  "generatedAt": "2026-07-19T19:30:21.208Z",
   "environment": "local-supabase-cli",
   "baseUrl": "http://127.0.0.1:54331/functions/v1",
+  "authMode": "gotrue-password-grant",
   "testIdentities": {
     "residentA": {
       "user": "10000000-0000-0000-0000-000000000001",
-      "fingerprint": "eF0yiTFM"
+      "fingerprint": "QiAKadsQ"
     },
     "residentB": {
       "user": "10000000-0000-0000-0000-000000000011",
-      "fingerprint": "Fkz-69SY"
+      "fingerprint": "34J0-HXA"
     },
     "operatorA": {
       "user": "10000000-0000-0000-0000-000000000002",
-      "fingerprint": "pPTuMZaA"
+      "fingerprint": "2Xf8oXsw"
     },
     "admin": {
       "user": "10000000-0000-0000-0000-000000000003",
-      "fingerprint": "XInfnyJg"
+      "fingerprint": "TjsSHASw"
     },
     "revoked": {
       "user": "10000000-0000-0000-0000-000000000022",
-      "fingerprint": "OH_QBlac"
+      "fingerprint": "_3r6_lvg"
     },
     "disabled": {
       "user": "10000000-0000-0000-0000-000000000033",
-      "fingerprint": "RuGUHqEQ"
+      "fingerprint": "5JA7bXog"
     },
     "unrelated": {
       "user": "10000000-0000-0000-0000-000000000044",
-      "fingerprint": "hYopjvgE"
+      "fingerprint": "rZsu1LpQ"
     }
   },
   "evidence": [
@@ -41,7 +42,7 @@
       "actualStatus": 401,
       "errorCode": "UNAUTHENTICATED",
       "passed": true,
-      "timestamp": "2026-07-19T16:27:42.312Z",
+      "timestamp": "2026-07-19T19:30:16.416Z",
       "detail": {
         "msg": "Sessao invalida ou expirada."
       }
@@ -54,7 +55,7 @@
       "actualStatus": 401,
       "errorCode": "UNAUTHENTICATED",
       "passed": true,
-      "timestamp": "2026-07-19T16:27:42.331Z",
+      "timestamp": "2026-07-19T19:30:16.765Z",
       "detail": {
         "msg": "Sessao invalida ou expirada."
       }
@@ -67,7 +68,7 @@
       "actualStatus": 401,
       "errorCode": "UNAUTHENTICATED",
       "passed": true,
-      "timestamp": "2026-07-19T16:27:42.353Z",
+      "timestamp": "2026-07-19T19:30:16.937Z",
       "detail": {
         "msg": "Sessao invalida ou expirada."
       }
@@ -80,7 +81,7 @@
       "actualStatus": 401,
       "errorCode": "UNAUTHENTICATED",
       "passed": true,
-      "timestamp": "2026-07-19T16:27:42.396Z",
+      "timestamp": "2026-07-19T19:30:17.113Z",
       "detail": {
         "msg": "Sessao invalida ou expirada."
       }
@@ -93,7 +94,7 @@
       "actualStatus": 401,
       "errorCode": "UNAUTHENTICATED",
       "passed": true,
-      "timestamp": "2026-07-19T16:27:42.425Z",
+      "timestamp": "2026-07-19T19:30:17.276Z",
       "detail": {
         "msg": "Sessao invalida ou expirada."
       }
@@ -106,7 +107,7 @@
       "actualStatus": 401,
       "errorCode": "UNAUTHENTICATED",
       "passed": true,
-      "timestamp": "2026-07-19T16:27:42.452Z",
+      "timestamp": "2026-07-19T19:30:17.522Z",
       "detail": {
         "msg": "Sessao invalida ou expirada."
       }
@@ -119,7 +120,7 @@
       "actualStatus": 401,
       "errorCode": "UNAUTHENTICATED",
       "passed": true,
-      "timestamp": "2026-07-19T16:27:42.469Z",
+      "timestamp": "2026-07-19T19:30:17.689Z",
       "detail": {
         "msg": "Sessao invalida ou expirada."
       }
@@ -132,7 +133,7 @@
       "actualStatus": 401,
       "errorCode": "UNAUTHENTICATED",
       "passed": true,
-      "timestamp": "2026-07-19T16:27:42.488Z",
+      "timestamp": "2026-07-19T19:30:17.879Z",
       "detail": {
         "msg": "Sessao invalida ou expirada."
       }
@@ -145,7 +146,7 @@
       "actualStatus": 401,
       "errorCode": "UNAUTHENTICATED",
       "passed": true,
-      "timestamp": "2026-07-19T16:27:42.506Z",
+      "timestamp": "2026-07-19T19:30:18.077Z",
       "detail": {
         "msg": "Sessao invalida ou expirada."
       }
@@ -158,7 +159,7 @@
       "actualStatus": 401,
       "errorCode": "UNAUTHENTICATED",
       "passed": true,
-      "timestamp": "2026-07-19T16:27:42.527Z",
+      "timestamp": "2026-07-19T19:30:18.274Z",
       "detail": {
         "msg": "Sessao invalida ou expirada."
       }
@@ -171,7 +172,7 @@
       "actualStatus": 401,
       "errorCode": "UNAUTHENTICATED",
       "passed": true,
-      "timestamp": "2026-07-19T16:27:42.542Z",
+      "timestamp": "2026-07-19T19:30:18.287Z",
       "detail": {
         "msg": "Sessao invalida ou expirada."
       }
@@ -184,7 +185,7 @@
       "actualStatus": 401,
       "errorCode": "UNAUTHENTICATED",
       "passed": true,
-      "timestamp": "2026-07-19T16:27:42.552Z",
+      "timestamp": "2026-07-19T19:30:18.297Z",
       "detail": {
         "msg": "Sessao invalida ou expirada."
       }
@@ -197,7 +198,7 @@
       "actualStatus": 401,
       "errorCode": "UNAUTHENTICATED",
       "passed": true,
-      "timestamp": "2026-07-19T16:27:42.564Z",
+      "timestamp": "2026-07-19T19:30:18.310Z",
       "detail": {
         "msg": "Sessao invalida ou expirada."
       }
@@ -210,8 +211,10 @@
       "actualStatus": 200,
       "errorCode": null,
       "passed": true,
-      "timestamp": "2026-07-19T16:27:42.643Z",
-      "detail": {}
+      "timestamp": "2026-07-19T19:30:18.395Z",
+      "detail": {
+        "hasData": true
+      }
     },
     {
       "testId": "EF-AUTH-03",
@@ -221,8 +224,10 @@
       "actualStatus": 200,
       "errorCode": null,
       "passed": true,
-      "timestamp": "2026-07-19T16:27:42.702Z",
-      "detail": {}
+      "timestamp": "2026-07-19T19:30:18.475Z",
+      "detail": {
+        "hasData": true
+      }
     },
     {
       "testId": "EF-AUTH-03",
@@ -232,8 +237,10 @@
       "actualStatus": 200,
       "errorCode": null,
       "passed": true,
-      "timestamp": "2026-07-19T16:27:42.784Z",
-      "detail": {}
+      "timestamp": "2026-07-19T19:30:18.579Z",
+      "detail": {
+        "hasData": true
+      }
     },
     {
       "testId": "EF-AUTH-03",
@@ -243,8 +250,10 @@
       "actualStatus": 200,
       "errorCode": null,
       "passed": true,
-      "timestamp": "2026-07-19T16:27:42.897Z",
-      "detail": {}
+      "timestamp": "2026-07-19T19:30:18.656Z",
+      "detail": {
+        "hasData": true
+      }
     },
     {
       "testId": "EF-AUTH-03",
@@ -254,8 +263,10 @@
       "actualStatus": 200,
       "errorCode": null,
       "passed": true,
-      "timestamp": "2026-07-19T16:27:42.974Z",
-      "detail": {}
+      "timestamp": "2026-07-19T19:30:18.722Z",
+      "detail": {
+        "hasData": true
+      }
     },
     {
       "testId": "EF-AUTH-03",
@@ -265,8 +276,10 @@
       "actualStatus": 200,
       "errorCode": null,
       "passed": true,
-      "timestamp": "2026-07-19T16:27:43.037Z",
-      "detail": {}
+      "timestamp": "2026-07-19T19:30:18.799Z",
+      "detail": {
+        "hasData": true
+      }
     },
     {
       "testId": "EF-AUTH-04",
@@ -274,11 +287,26 @@
       "identity": "residentB→self",
       "expectedStatus": 200,
       "actualStatus": 200,
+      "errorCode": null,
       "passed": true,
-      "timestamp": "2026-07-19T16:27:43.152Z",
+      "timestamp": "2026-07-19T19:30:18.885Z",
       "detail": {
         "profileId": "20000000-0000-0000-0000-000000000011",
         "expectedOwnProfile": "20000000-0000-0000-0000-000000000011"
+      }
+    },
+    {
+      "testId": "EF-AUTH-04",
+      "function": "profiles-rls",
+      "identity": "residentB→A",
+      "expectedStatus": 0,
+      "actualStatus": 0,
+      "errorCode": null,
+      "passed": true,
+      "timestamp": "2026-07-19T19:30:19.116Z",
+      "detail": {
+        "rowsVisibleToB": 0,
+        "rowsExist": 1
       }
     },
     {
@@ -289,7 +317,7 @@
       "actualStatus": 403,
       "errorCode": "FORBIDDEN",
       "passed": true,
-      "timestamp": "2026-07-19T16:27:43.204Z",
+      "timestamp": "2026-07-19T19:30:19.204Z",
       "detail": {
         "msg": "Tenant solicitado nao pertence ao contexto autenticado."
       }
@@ -302,7 +330,7 @@
       "actualStatus": 403,
       "errorCode": "FORBIDDEN",
       "passed": true,
-      "timestamp": "2026-07-19T16:27:43.265Z",
+      "timestamp": "2026-07-19T19:30:19.275Z",
       "detail": {
         "msg": "Tenant solicitado nao pertence ao contexto autenticado."
       }
@@ -315,7 +343,7 @@
       "actualStatus": 403,
       "errorCode": "FORBIDDEN",
       "passed": true,
-      "timestamp": "2026-07-19T16:27:43.329Z",
+      "timestamp": "2026-07-19T19:30:19.392Z",
       "detail": {
         "msg": "Tenant solicitado nao pertence ao contexto autenticado."
       }
@@ -328,7 +356,7 @@
       "actualStatus": 403,
       "errorCode": "FORBIDDEN",
       "passed": true,
-      "timestamp": "2026-07-19T16:27:43.389Z",
+      "timestamp": "2026-07-19T19:30:19.521Z",
       "detail": {
         "msg": "Tenant solicitado nao pertence ao contexto autenticado."
       }
@@ -341,8 +369,13 @@
       "actualStatus": 200,
       "errorCode": null,
       "passed": true,
-      "timestamp": "2026-07-19T16:27:43.442Z",
-      "detail": {}
+      "timestamp": "2026-07-19T19:30:19.707Z",
+      "detail": {
+        "isPlatformAdmin": true,
+        "platformRoles": [
+          "platform_admin"
+        ]
+      }
     },
     {
       "testId": "EF-AUTH-08",
@@ -352,30 +385,34 @@
       "actualStatus": 200,
       "errorCode": null,
       "passed": true,
-      "timestamp": "2026-07-19T16:27:43.509Z",
-      "detail": {}
+      "timestamp": "2026-07-19T19:30:19.707Z",
+      "detail": {
+        "hasData": true
+      }
     },
     {
       "testId": "EF-AUTH-09",
       "function": "auth-context",
       "identity": "revoked",
-      "expectedStatus": 0,
+      "expectedStatus": 200,
       "actualStatus": 200,
+      "errorCode": null,
       "passed": true,
-      "timestamp": "2026-07-19T16:27:43.562Z",
+      "timestamp": "2026-07-19T19:30:19.783Z",
       "detail": {
-        "residenceCount": 0
+        "residenceCount": 0,
+        "tenantCount": 0
       }
     },
     {
       "testId": "EF-AUTH-10",
       "function": "profile-get",
       "identity": "disabled",
-      "expectedStatus": 403,
+      "expectedStatus": 404,
       "actualStatus": 404,
       "errorCode": "NOT_FOUND",
       "passed": true,
-      "timestamp": "2026-07-19T16:27:43.615Z",
+      "timestamp": "2026-07-19T19:30:19.863Z",
       "detail": {
         "msg": "Perfil nao encontrado para o usuario autenticado."
       }
@@ -383,12 +420,12 @@
     {
       "testId": "EF-AUTH-11",
       "function": "profile-update",
-      "identity": "residentA",
+      "identity": "residentA-bad-json",
       "expectedStatus": 422,
       "actualStatus": 422,
       "errorCode": "VALIDATION_ERROR",
       "passed": true,
-      "timestamp": "2026-07-19T16:27:43.699Z",
+      "timestamp": "2026-07-19T19:30:19.916Z",
       "detail": {
         "msg": "Corpo JSON invalido."
       }
@@ -396,12 +433,12 @@
     {
       "testId": "EF-AUTH-11",
       "function": "profile-contact-upsert",
-      "identity": "residentA",
+      "identity": "residentA-missing-fields",
       "expectedStatus": 422,
       "actualStatus": 500,
       "errorCode": "PARSE_ERROR",
       "passed": true,
-      "timestamp": "2026-07-19T16:27:43.760Z",
+      "timestamp": "2026-07-19T19:30:20.010Z",
       "detail": {
         "msg": "non-json response"
       }
@@ -412,11 +449,13 @@
       "identity": "residentA",
       "expectedStatus": 200,
       "actualStatus": 200,
+      "errorCode": null,
       "passed": true,
-      "timestamp": "2026-07-19T16:27:43.825Z",
+      "timestamp": "2026-07-19T19:30:20.450Z",
       "detail": {
-        "msg": "protected field ignored at Edge Function layer; DB trigger protects at SQL level",
-        "hasData": true
+        "originalName": "Ana Resident A",
+        "afterName": "Ana Resident A",
+        "preferred_name": "AnaSafe"
       }
     },
     {
@@ -424,12 +463,13 @@
       "function": "profile-contact-upsert",
       "identity": "residentA",
       "expectedStatus": 200,
-      "actualStatus": 409,
-      "errorCode": "CONFLICT",
+      "actualStatus": 200,
+      "errorCode": null,
       "passed": true,
-      "timestamp": "2026-07-19T16:27:43.894Z",
+      "timestamp": "2026-07-19T19:30:20.663Z",
       "detail": {
-        "status": 409
+        "verification_state": "unverified",
+        "sqlSpoofDenied": true
       }
     },
     {
@@ -438,30 +478,35 @@
       "identity": "residentA",
       "expectedStatus": 200,
       "actualStatus": 200,
+      "errorCode": null,
       "passed": true,
-      "timestamp": "2026-07-19T16:27:43.960Z",
+      "timestamp": "2026-07-19T19:30:21.138Z",
       "detail": {
-        "hasData": true,
-        "id": "20000000-0000-0000-0000-000000000001"
+        "auditId": "0f41c299-9130-4f6c-bf37-37952d969935",
+        "action": "profile.update.self",
+        "source": "edge_function:profile-update",
+        "immutable": true,
+        "beforeCount": 1,
+        "afterCount": 2
       }
     },
     {
       "testId": "EF-AUTH-15",
       "function": "profile-update",
       "identity": "residentA",
-      "expectedStatus": 422,
+      "expectedStatus": 500,
       "actualStatus": 500,
       "errorCode": "PARSE_ERROR",
       "passed": true,
-      "timestamp": "2026-07-19T16:27:44.022Z",
+      "timestamp": "2026-07-19T19:30:21.208Z",
       "detail": {
         "msg": "non-json response"
       }
     }
   ],
   "summary": {
-    "total": 38,
-    "passed": 38,
+    "total": 35,
+    "passed": 35,
     "failed": 0
   }
 }

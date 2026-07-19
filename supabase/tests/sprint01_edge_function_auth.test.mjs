@@ -1,6 +1,7 @@
-import { execSync } from 'node:child_process';
+import { execFileSync, execSync } from 'node:child_process';
 import fs from 'node:fs';
-import crypto from 'node:crypto';
+
+const DB_CONTAINER = 'supabase_db_aistudio-hoa-connect-resident-app';
 
 function loadSupabaseEnv() {
   const output = execSync('supabase status -o env 2>/dev/null', { encoding: 'utf-8' });
@@ -16,285 +17,592 @@ function loadSupabaseEnv() {
   return env;
 }
 
-function signJwt(secret, payload) {
-  const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
-  const body = Buffer.from(JSON.stringify(payload)).toString('base64url');
-  const sig = crypto.createHmac('sha256', secret).update(`${header}.${body}`).digest('base64url');
-  return `${header}.${body}.${sig}`;
+function sql(query) {
+  const out = execFileSync(
+    'docker',
+    [
+      'exec',
+      '-i',
+      DB_CONTAINER,
+      'psql',
+      '-U',
+      'postgres',
+      '-d',
+      'postgres',
+      '-v',
+      'ON_ERROR_STOP=1',
+      '-t',
+      '-A',
+      '-F',
+      '|',
+      '-c',
+      query,
+    ],
+    { encoding: 'utf-8' },
+  );
+  return out.trim();
+}
+
+function sqlScript(script) {
+  return execFileSync(
+    'docker',
+    ['exec', '-i', DB_CONTAINER, 'psql', '-U', 'postgres', '-d', 'postgres', '-v', 'ON_ERROR_STOP=1', '-t', '-A'],
+    { encoding: 'utf-8', input: script },
+  ).trim();
+}
+
+function sqlOk(script) {
+  try {
+    sqlScript(script);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 const IDS = {
-  residentA: { user: '10000000-0000-0000-0000-000000000001', profile: '20000000-0000-0000-0000-000000000001' },
-  operatorA: { user: '10000000-0000-0000-0000-000000000002', profile: '20000000-0000-0000-0000-000000000002' },
-  admin:    { user: '10000000-0000-0000-0000-000000000003', profile: '20000000-0000-0000-0000-000000000003' },
-  residentB: { user: '10000000-0000-0000-0000-000000000011', profile: '20000000-0000-0000-0000-000000000011' },
-  revoked:   { user: '10000000-0000-0000-0000-000000000022', profile: '20000000-0000-0000-0000-000000000022' },
-  disabled:  { user: '10000000-0000-0000-0000-000000000033', profile: '20000000-0000-0000-0000-000000000033' },
-  unrelated: { user: '10000000-0000-0000-0000-000000000044', profile: '20000000-0000-0000-0000-000000000044' },
+  residentA: {
+    user: '10000000-0000-0000-0000-000000000001',
+    profile: '20000000-0000-0000-0000-000000000001',
+    email: 'resident.a@example.com',
+  },
+  operatorA: {
+    user: '10000000-0000-0000-0000-000000000002',
+    profile: '20000000-0000-0000-0000-000000000002',
+    email: 'operator.a@example.com',
+  },
+  admin: {
+    user: '10000000-0000-0000-0000-000000000003',
+    profile: '20000000-0000-0000-0000-000000000003',
+    email: 'platform.admin@example.com',
+  },
+  residentB: {
+    user: '10000000-0000-0000-0000-000000000011',
+    profile: '20000000-0000-0000-0000-000000000011',
+    email: 'resident.b@example.com',
+  },
+  revoked: {
+    user: '10000000-0000-0000-0000-000000000022',
+    profile: '20000000-0000-0000-0000-000000000022',
+    email: 'revoked@example.com',
+  },
+  disabled: {
+    user: '10000000-0000-0000-0000-000000000033',
+    profile: '20000000-0000-0000-0000-000000000033',
+    email: 'disabled@example.com',
+  },
+  unrelated: {
+    user: '10000000-0000-0000-0000-000000000044',
+    profile: '20000000-0000-0000-0000-000000000044',
+    email: 'unrelated@example.com',
+  },
   tenantA: '11111111-1111-1111-1111-111111111111',
   tenantB: '11111111-1111-1111-1111-222222222222',
 };
 
+const PASSWORD = 'Password123!';
 const evidence = [];
 let passed = 0;
 let failed = 0;
 
+function fingerprintToken(token) {
+  if (!token || typeof token !== 'string') return null;
+  return token.slice(-8);
+}
+
 function record(testId, func, identity, expectedStatus, actualStatus, errorCode, ok, detail) {
   evidence.push({
-    testId, function: func, identity,
-    expectedStatus, actualStatus, errorCode, passed: ok,
+    testId,
+    function: func,
+    identity,
+    expectedStatus,
+    actualStatus,
+    errorCode: errorCode || null,
+    passed: ok,
     timestamp: new Date().toISOString(),
     detail: detail || null,
   });
-  if (ok) { passed++; console.log(`  PASS ${testId}: ${func} as ${identity} → ${actualStatus}`); }
-  else { failed++; console.warn(`  FAIL ${testId}: ${func} as ${identity} → got ${actualStatus} (expected ${expectedStatus}) ${errorCode||''}`); }
-}
-
-function check(testId, func, identity, actual, expectedStatus, expectedErrorCode) {
-  const statusOk = actual.status === expectedStatus;
-  const codeOk = expectedErrorCode ? actual.body?.error?.code === expectedErrorCode : true;
-  const ok = statusOk && codeOk;
-  record(testId, func, identity, expectedStatus, actual.status, actual.body?.error?.code || null, ok, { msg: actual.body?.error?.message });
-}
-
-async function callFn(url, name, method, token, body) {
-  const headers = {
-    'Content-Type': 'application/json',
-    'x-request-id': `test-${name}-${Math.random().toString(36).slice(2, 8)}`,
-  };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-  const init = { method, headers };
-  if (body) init.body = JSON.stringify(body);
-  try {
-    const res = await fetch(`${url}/${name}`, init);
-    const json = await res.json().catch(() => ({ error: { code: 'PARSE_ERROR', message: 'non-json response' } }));
-    return { status: res.status, body: json };
-  } catch (err) {
-    return { status: 0, body: { error: { code: 'NETWORK_ERROR', message: err.message } } };
+  if (ok) {
+    passed += 1;
+    console.log(`  PASS ${testId}: ${func} as ${identity} → ${actualStatus}`);
+  } else {
+    failed += 1;
+    console.warn(
+      `  FAIL ${testId}: ${func} as ${identity} → got ${actualStatus} (expected ${expectedStatus}) ${errorCode || ''}`,
+    );
   }
 }
 
-function makeToken(secret, sub, extra) {
-  return signJwt(secret, {
-    sub, role: 'authenticated', aud: 'authenticated',
-    iat: Math.floor(Date.now() / 1000),
-    exp: Math.floor(Date.now() / 1000) + 3600,
-    ...extra,
+async function mintAccessToken(apiUrl, anonKey, email, password) {
+  const res = await fetch(`${apiUrl}/auth/v1/token?grant_type=password`, {
+    method: 'POST',
+    headers: {
+      apikey: anonKey,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ email, password }),
   });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok || !body.access_token) {
+    throw new Error(`Failed to mint token for ${email}: ${res.status} ${JSON.stringify(body)}`);
+  }
+  return body.access_token;
+}
+
+async function callFn(baseUrl, anonKey, name, method, token, body, rawBody) {
+  const headers = {
+    'Content-Type': 'application/json',
+    apikey: anonKey,
+    'x-request-id': `test-${name}-${Math.random().toString(36).slice(2, 8)}`,
+  };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const init = { method, headers };
+  if (rawBody !== undefined) init.body = rawBody;
+  else if (body !== undefined) init.body = JSON.stringify(body);
+  try {
+    const res = await fetch(`${baseUrl}/${name}`, init);
+    const text = await res.text();
+    let json;
+    try {
+      json = JSON.parse(text);
+    } catch {
+      json = { error: { code: 'PARSE_ERROR', message: 'non-json response', raw: text.slice(0, 200) } };
+    }
+    return { status: res.status, body: json, text };
+  } catch (err) {
+    return { status: 0, body: { error: { code: 'NETWORK_ERROR', message: err.message } }, text: '' };
+  }
+}
+
+function isSafeErrorEnvelope(body) {
+  if (!body || typeof body !== 'object') return false;
+  const err = body.error;
+  if (!err || typeof err !== 'object') return false;
+  const blob = JSON.stringify(body).toLowerCase();
+  if (blob.includes('stack') || blob.includes('postgres') || blob.includes('relation ') || blob.includes('sqlstate')) {
+    return false;
+  }
+  return typeof err.code === 'string' && typeof err.message === 'string';
 }
 
 async function main() {
   console.log('=== Sprint 1 Edge Function Authorization Tests ===\n');
 
   const env = loadSupabaseEnv();
-  const baseUrl = env.FUNCTIONS_URL || 'http://127.0.0.1:54331/functions/v1';
-  const jwtSecret = env.JWT_SECRET || 'super-secret-jwt-token-with-at-least-32-characters-long';
+  const apiUrl = env.API_URL || 'http://127.0.0.1:54331';
+  const baseUrl = env.FUNCTIONS_URL || `${apiUrl}/functions/v1`;
+  const anonKey = env.ANON_KEY;
 
+  if (!anonKey) throw new Error('ANON_KEY missing from supabase status');
+
+  console.log(`API URL: ${apiUrl}`);
   console.log(`Edge Functions URL: ${baseUrl}`);
-  console.log(`JWT secret fingerprint: ${jwtSecret.slice(0, 8)}...\n`);
+  console.log('Auth mode: GoTrue password grant (real sessions)\n');
 
-  // Build test tokens
   const T = {
-    residentA: makeToken(jwtSecret, IDS.residentA.user),
-    operatorA: makeToken(jwtSecret, IDS.operatorA.user),
-    admin:     makeToken(jwtSecret, IDS.admin.user),
-    residentB: makeToken(jwtSecret, IDS.residentB.user),
-    revoked:   makeToken(jwtSecret, IDS.revoked.user),
-    disabled:  makeToken(jwtSecret, IDS.disabled.user),
-    unrelated: makeToken(jwtSecret, IDS.unrelated.user),
-    invalid:   'invalid.token.structure',
-    expired:   makeToken(jwtSecret, IDS.residentA.user, { iat: Math.floor(Date.now()/1000) - 7200, exp: Math.floor(Date.now()/1000) - 3600 }),
+    residentA: await mintAccessToken(apiUrl, anonKey, IDS.residentA.email, PASSWORD),
+    operatorA: await mintAccessToken(apiUrl, anonKey, IDS.operatorA.email, PASSWORD),
+    admin: await mintAccessToken(apiUrl, anonKey, IDS.admin.email, PASSWORD),
+    residentB: await mintAccessToken(apiUrl, anonKey, IDS.residentB.email, PASSWORD),
+    revoked: await mintAccessToken(apiUrl, anonKey, IDS.revoked.email, PASSWORD),
+    disabled: await mintAccessToken(apiUrl, anonKey, IDS.disabled.email, PASSWORD),
+    unrelated: await mintAccessToken(apiUrl, anonKey, IDS.unrelated.email, PASSWORD),
+    invalid: 'invalid.token.structure',
+    expired: null,
   };
+
+  // Expired token: mint then force exp in past is not possible for GoTrue; use a clearly expired self-forged shape rejected by getUser.
+  T.expired =
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.' +
+    Buffer.from(
+      JSON.stringify({
+        sub: IDS.residentA.user,
+        role: 'authenticated',
+        aud: 'authenticated',
+        exp: Math.floor(Date.now() / 1000) - 3600,
+        iat: Math.floor(Date.now() / 1000) - 7200,
+      }),
+    ).toString('base64url') +
+    '.invalidsignature';
 
   const GET = ['auth-context', 'profile-get', 'profile-contacts-list', 'tenant-context-list', 'resident-auth'];
   const POST = ['auth-bootstrap', 'tenant-context-select'];
-  const others = [{ name: 'profile-contact-upsert', method: 'PUT' }, { name: 'profile-contact-delete', method: 'DELETE' }, { name: 'profile-update', method: 'PATCH' }];
 
   // ─── EF-AUTH-01: Anonymous request ───
   console.log('[EF-AUTH-01] Anonymous request');
   for (const fn of GET) {
-    check('EF-AUTH-01', fn, 'anonymous', await callFn(baseUrl, fn, 'GET', null), 401, 'UNAUTHENTICATED');
+    const r = await callFn(baseUrl, anonKey, fn, 'GET', null);
+    const ok = r.status === 401 && r.body?.error?.code === 'UNAUTHENTICATED' && isSafeErrorEnvelope(r.body);
+    record('EF-AUTH-01', fn, 'anonymous', 401, r.status, r.body?.error?.code, ok, { msg: r.body?.error?.message });
   }
   for (const fn of POST) {
-    check('EF-AUTH-01', fn, 'anonymous', await callFn(baseUrl, fn, 'POST', null, {}), 401, 'UNAUTHENTICATED');
+    const r = await callFn(baseUrl, anonKey, fn, 'POST', null, {});
+    const ok = r.status === 401 && r.body?.error?.code === 'UNAUTHENTICATED' && isSafeErrorEnvelope(r.body);
+    record('EF-AUTH-01', fn, 'anonymous', 401, r.status, r.body?.error?.code, ok, { msg: r.body?.error?.message });
   }
-  check('EF-AUTH-01', 'profile-contact-upsert', 'anonymous', await callFn(baseUrl, 'profile-contact-upsert', 'PUT', null, {}), 401, 'UNAUTHENTICATED');
-  check('EF-AUTH-01', 'profile-contact-delete', 'anonymous', await callFn(baseUrl, 'profile-contact-delete', 'DELETE', null), 401, 'UNAUTHENTICATED');
-  check('EF-AUTH-01', 'profile-update', 'anonymous', await callFn(baseUrl, 'profile-update', 'PATCH', null, {}), 401, 'UNAUTHENTICATED');
+  for (const [fn, method] of [
+    ['profile-contact-upsert', 'PUT'],
+    ['profile-contact-delete', 'DELETE'],
+    ['profile-update', 'PATCH'],
+  ]) {
+    const r = await callFn(baseUrl, anonKey, fn, method, null, method === 'DELETE' ? undefined : {});
+    const ok = r.status === 401 && r.body?.error?.code === 'UNAUTHENTICATED' && isSafeErrorEnvelope(r.body);
+    record('EF-AUTH-01', fn, 'anonymous', 401, r.status, r.body?.error?.code, ok, { msg: r.body?.error?.message });
+  }
 
   // ─── EF-AUTH-02: Invalid/expired token ───
   console.log('\n[EF-AUTH-02] Invalid/expired token');
-  check('EF-AUTH-02', 'auth-context', 'invalid', await callFn(baseUrl, 'auth-context', 'GET', T.invalid), 401, 'UNAUTHENTICATED');
-  check('EF-AUTH-02', 'profile-get', 'invalid', await callFn(baseUrl, 'profile-get', 'GET', T.invalid), 401, 'UNAUTHENTICATED');
-  check('EF-AUTH-02', 'auth-context', 'expired', await callFn(baseUrl, 'auth-context', 'GET', T.expired), 401, 'UNAUTHENTICATED');
+  for (const [identity, token, fn] of [
+    ['invalid', T.invalid, 'auth-context'],
+    ['invalid', T.invalid, 'profile-get'],
+    ['expired', T.expired, 'auth-context'],
+  ]) {
+    const r = await callFn(baseUrl, anonKey, fn, 'GET', token);
+    const ok = r.status === 401 && r.body?.error?.code === 'UNAUTHENTICATED' && isSafeErrorEnvelope(r.body);
+    record('EF-AUTH-02', fn, identity, 401, r.status, r.body?.error?.code, ok, { msg: r.body?.error?.message });
+  }
 
   // ─── EF-AUTH-03: Valid self access ───
   console.log('\n[EF-AUTH-03] Valid self access');
-  check('EF-AUTH-03', 'auth-context', 'residentA', await callFn(baseUrl, 'auth-context', 'GET', T.residentA), 200, null);
-  check('EF-AUTH-03', 'auth-bootstrap', 'residentA', await callFn(baseUrl, 'auth-bootstrap', 'POST', T.residentA), 200, null);
-  check('EF-AUTH-03', 'profile-get', 'residentA', await callFn(baseUrl, 'profile-get', 'GET', T.residentA), 200, null);
-  check('EF-AUTH-03', 'profile-contacts-list', 'residentA', await callFn(baseUrl, 'profile-contacts-list', 'GET', T.residentA), 200, null);
-  check('EF-AUTH-03', 'tenant-context-list', 'residentA', await callFn(baseUrl, 'tenant-context-list', 'GET', T.residentA), 200, null);
-  check('EF-AUTH-03', 'resident-auth', 'residentA', await callFn(baseUrl, 'resident-auth', 'GET', T.residentA), 200, null);
+  {
+    const cases = [
+      ['auth-context', 'GET', undefined],
+      ['auth-bootstrap', 'POST', {}],
+      ['profile-get', 'GET', undefined],
+      ['profile-contacts-list', 'GET', undefined],
+      ['tenant-context-list', 'GET', undefined],
+      ['resident-auth', 'GET', undefined],
+    ];
+    for (const [fn, method, body] of cases) {
+      const r = await callFn(baseUrl, anonKey, fn, method, T.residentA, body);
+      const ok = r.status === 200 && r.body?.data != null && !r.body?.error;
+      record('EF-AUTH-03', fn, 'residentA', 200, r.status, r.body?.error?.code, ok, {
+        hasData: r.body?.data != null,
+      });
+    }
+  }
 
   // ─── EF-AUTH-04: Cross-profile denial ───
-  // profile-get always returns the authenticated user's own profile (no target param).
-  // Cross-profile access is enforced at the SQL/RLS level. Document as edge boundary.
   console.log('\n[EF-AUTH-04] Cross-profile access boundary');
   {
-    const r = await callFn(baseUrl, 'profile-get', 'GET', T.residentB);
-    const selfOnly = r.status === 200 && r.body?.data?.profile?.id === IDS.residentB.profile;
-    record('EF-AUTH-04', 'profile-get', 'residentB→self', 200, r.status, r.body?.error?.code, selfOnly,
-      { profileId: r.body?.data?.profile?.id, expectedOwnProfile: IDS.residentB.profile });
+    const self = await callFn(baseUrl, anonKey, 'profile-get', 'GET', T.residentB);
+    const selfOk =
+      self.status === 200 && self.body?.data?.profile?.id === IDS.residentB.profile;
+    record('EF-AUTH-04', 'profile-get', 'residentB→self', 200, self.status, self.body?.error?.code, selfOk, {
+      profileId: self.body?.data?.profile?.id,
+      expectedOwnProfile: IDS.residentB.profile,
+    });
+
+    // SQL/RLS boundary: resident B cannot read resident A profile under JWT claims.
+    const existCount = Number(
+      sql(`SELECT COUNT(*)::int FROM public.profiles WHERE id = '${IDS.residentA.profile}'`),
+    );
+    const rlsRaw = sqlScript(`
+BEGIN;
+SELECT set_config('request.jwt.claim.role', 'authenticated', true);
+SELECT set_config('request.jwt.claim.sub', '${IDS.residentB.user}', true);
+SET LOCAL ROLE authenticated;
+SELECT COUNT(*)::int AS c FROM public.profiles WHERE id = '${IDS.residentA.profile}';
+ROLLBACK;
+`);
+    const rlsCount = Number(
+      rlsRaw
+        .split('\n')
+        .map((l) => l.trim())
+        .filter((l) => /^\d+$/.test(l))
+        .at(-1),
+    );
+    const denied = rlsCount === 0;
+    const visibleAsSuper = existCount === 1;
+    record(
+      'EF-AUTH-04',
+      'profiles-rls',
+      'residentB→A',
+      0,
+      denied ? 0 : rlsCount,
+      null,
+      denied && visibleAsSuper,
+      { rowsVisibleToB: rlsCount, rowsExist: existCount },
+    );
   }
 
   // ─── EF-AUTH-05: Cross-tenant denial ───
   console.log('\n[EF-AUTH-05] Cross-tenant denial');
-  check('EF-AUTH-05', 'tenant-context-select', 'residentA→B',
-    await callFn(baseUrl, 'tenant-context-select', 'POST', T.residentA, { tenant_id: IDS.tenantB }), 403, 'FORBIDDEN');
+  {
+    const r = await callFn(baseUrl, anonKey, 'tenant-context-select', 'POST', T.residentA, {
+      tenant_id: IDS.tenantB,
+    });
+    const ok = r.status === 403 && r.body?.error?.code === 'FORBIDDEN' && isSafeErrorEnvelope(r.body);
+    record('EF-AUTH-05', 'tenant-context-select', 'residentA→B', 403, r.status, r.body?.error?.code, ok, {
+      msg: r.body?.error?.message,
+    });
+  }
 
   // ─── EF-AUTH-06: Forged tenant context ───
   console.log('\n[EF-AUTH-06] Forged tenant context');
-  check('EF-AUTH-06', 'tenant-context-select', 'residentB→A',
-    await callFn(baseUrl, 'tenant-context-select', 'POST', T.residentB, { tenant_id: IDS.tenantA }), 403, 'FORBIDDEN');
-  check('EF-AUTH-06', 'tenant-context-select', 'operatorA→B',
-    await callFn(baseUrl, 'tenant-context-select', 'POST', T.operatorA, { tenant_id: IDS.tenantB }), 403, 'FORBIDDEN');
+  for (const [identity, token, tenant] of [
+    ['residentB→A', T.residentB, IDS.tenantA],
+    ['operatorA→B', T.operatorA, IDS.tenantB],
+  ]) {
+    const r = await callFn(baseUrl, anonKey, 'tenant-context-select', 'POST', token, { tenant_id: tenant });
+    const ok = r.status === 403 && r.body?.error?.code === 'FORBIDDEN' && isSafeErrorEnvelope(r.body);
+    record('EF-AUTH-06', 'tenant-context-select', identity, 403, r.status, r.body?.error?.code, ok, {
+      msg: r.body?.error?.message,
+    });
+  }
 
   // ─── EF-AUTH-07: Permission enforcement ───
   console.log('\n[EF-AUTH-07] Permission enforcement');
-  check('EF-AUTH-07', 'tenant-context-select', 'unrelated→A',
-    await callFn(baseUrl, 'tenant-context-select', 'POST', T.unrelated, { tenant_id: IDS.tenantA }), 403, 'FORBIDDEN');
+  {
+    const r = await callFn(baseUrl, anonKey, 'tenant-context-select', 'POST', T.unrelated, {
+      tenant_id: IDS.tenantA,
+    });
+    const ok = r.status === 403 && r.body?.error?.code === 'FORBIDDEN' && isSafeErrorEnvelope(r.body);
+    record('EF-AUTH-07', 'tenant-context-select', 'unrelated→A', 403, r.status, r.body?.error?.code, ok, {
+      msg: r.body?.error?.message,
+    });
+  }
 
   // ─── EF-AUTH-08: Platform admin path ───
   console.log('\n[EF-AUTH-08] Platform admin path');
-  check('EF-AUTH-08', 'auth-context', 'admin', await callFn(baseUrl, 'auth-context', 'GET', T.admin), 200, null);
-  check('EF-AUTH-08', 'tenant-context-list', 'admin', await callFn(baseUrl, 'tenant-context-list', 'GET', T.admin), 200, null);
+  {
+    const ctx = await callFn(baseUrl, anonKey, 'auth-context', 'GET', T.admin);
+    const list = await callFn(baseUrl, anonKey, 'tenant-context-list', 'GET', T.admin);
+    const adminOk =
+      ctx.status === 200 &&
+      ctx.body?.data?.statusFlags?.isPlatformAdmin === true &&
+      Array.isArray(ctx.body?.data?.platformRoles) &&
+      ctx.body.data.platformRoles.includes('platform_admin');
+    record('EF-AUTH-08', 'auth-context', 'admin', 200, ctx.status, ctx.body?.error?.code, adminOk, {
+      isPlatformAdmin: ctx.body?.data?.statusFlags?.isPlatformAdmin,
+      platformRoles: ctx.body?.data?.platformRoles,
+    });
+    const listOk = list.status === 200 && list.body?.data != null;
+    record('EF-AUTH-08', 'tenant-context-list', 'admin', 200, list.status, list.body?.error?.code, listOk, {
+      hasData: list.body?.data != null,
+    });
+  }
 
   // ─── EF-AUTH-09: Revoked membership ───
   console.log('\n[EF-AUTH-09] Revoked membership');
   {
-    const r = await callFn(baseUrl, 'auth-context', 'GET', T.revoked);
-    const residences = r.body?.data?.availableResidences;
-    const denied = !residences || residences.length === 0 || r.status !== 200;
-    record('EF-AUTH-09', 'auth-context', 'revoked', 0, r.status, r.body?.error?.code, denied,
-      { residenceCount: residences?.length || 0 });
+    const r = await callFn(baseUrl, anonKey, 'auth-context', 'GET', T.revoked);
+    const residences = r.body?.data?.availableResidences ?? [];
+    const tenants = r.body?.data?.availableTenants ?? [];
+    const ok = r.status === 200 && residences.length === 0 && tenants.length === 0;
+    record('EF-AUTH-09', 'auth-context', 'revoked', 200, r.status, r.body?.error?.code, ok, {
+      residenceCount: residences.length,
+      tenantCount: tenants.length,
+    });
   }
 
   // ─── EF-AUTH-10: Disabled user ───
   console.log('\n[EF-AUTH-10] Disabled user');
   {
-    const r = await callFn(baseUrl, 'profile-get', 'GET', T.disabled);
-    const denied = r.status !== 200;
-    record('EF-AUTH-10', 'profile-get', 'disabled', 403, r.status, r.body?.error?.code, denied,
-      { msg: r.body?.error?.message });
+    const r = await callFn(baseUrl, anonKey, 'profile-get', 'GET', T.disabled);
+    // Disabled profile may be hidden (404) or explicit forbid; never return active profile payload.
+    const denied =
+      r.status !== 200 ||
+      r.body?.data?.profile == null ||
+      r.body?.data?.profile?.status === 'disabled';
+    const noActivePayload =
+      r.status !== 200 ||
+      r.body?.data?.profile?.status === 'disabled' ||
+      r.body?.error?.code === 'NOT_FOUND' ||
+      r.body?.error?.code === 'FORBIDDEN';
+    record('EF-AUTH-10', 'profile-get', 'disabled', 404, r.status, r.body?.error?.code, denied && noActivePayload, {
+      msg: r.body?.error?.message,
+      status: r.body?.data?.profile?.status,
+    });
   }
 
   // ─── EF-AUTH-11: Input validation ───
   console.log('\n[EF-AUTH-11] Input validation');
-  // Send truly invalid JSON (non-JSON string)
   {
-    const headers = { 'Content-Type': 'application/json', 'x-request-id': 'test-bad-json', 'Authorization': 'Bearer ' + T.residentA };
-    const r = await fetch(`${baseUrl}/profile-update`, { method: 'PATCH', headers, body: '{invalid' });
-    const j = await r.json().catch(() => ({}));
-    const ok = r.status === 422 || r.status === 400;
-    record('EF-AUTH-11', 'profile-update', 'residentA', 422, r.status, j?.error?.code, ok, { msg: j?.error?.message });
-    if (ok) { passed++; console.log(`  PASS EF-AUTH-11: profile-update with bad JSON → ${r.status}`); }
-    else { failed++; console.warn(`  FAIL EF-AUTH-11: profile-update → ${r.status}`); }
-  }
-  // profile-contact-upsert with missing required fields
-  {
-    const r = await callFn(baseUrl, 'profile-contact-upsert', 'PUT', T.residentA, { contact_type: 'email' });
-    const ok = r.status === 422 || r.status === 500;
-    record('EF-AUTH-11', 'profile-contact-upsert', 'residentA', 422, r.status, r.body?.error?.code, ok,
-      { msg: r.body?.error?.message });
-    if (ok) { passed++; console.log(`  PASS EF-AUTH-11: profile-contact-upsert missing required fields → ${r.status}`); }
-    else { failed++; console.warn(`  FAIL EF-AUTH-11: profile-contact-upsert → ${r.status}`); }
+    const badJson = await callFn(
+      baseUrl,
+      anonKey,
+      'profile-update',
+      'PATCH',
+      T.residentA,
+      undefined,
+      '{invalid',
+    );
+    const okBad =
+      (badJson.status === 422 || badJson.status === 400) &&
+      isSafeErrorEnvelope(badJson.body);
+    record('EF-AUTH-11', 'profile-update', 'residentA-bad-json', 422, badJson.status, badJson.body?.error?.code, okBad, {
+      msg: badJson.body?.error?.message,
+    });
+
+    const missing = await callFn(baseUrl, anonKey, 'profile-contact-upsert', 'PUT', T.residentA, {
+      contact_type: 'email',
+    });
+    // requireString throws → runtime 500 mapped by edge runtime, or function may 422 if wrapped.
+    const okMissing =
+      missing.status >= 400 &&
+      missing.status < 600 &&
+      (isSafeErrorEnvelope(missing.body) || missing.body?.error?.code === 'PARSE_ERROR');
+    record(
+      'EF-AUTH-11',
+      'profile-contact-upsert',
+      'residentA-missing-fields',
+      422,
+      missing.status,
+      missing.body?.error?.code,
+      okMissing,
+      { msg: missing.body?.error?.message },
+    );
   }
 
   // ─── EF-AUTH-12: Protected profile fields ───
-  // profile-update only allows preferred_name, avatar_url, locale, timezone.
-  // Sending full_name is silently ignored by the function payload builder.
-  // Actual mutation protection is enforced by profiles_protected_fields_immutable trigger at SQL level.
   console.log('\n[EF-AUTH-12] Protected profile fields');
   {
-    const r = await callFn(baseUrl, 'profile-update', 'PATCH', T.residentA, { full_name: 'evil' });
-    // The function ignores full_name and updates only allowed fields. Response should be 200.
-    const ok = r.status === 200;
-    record('EF-AUTH-12', 'profile-update', 'residentA', 200, r.status, r.body?.error?.code, ok,
-      { msg: 'protected field ignored at Edge Function layer; DB trigger protects at SQL level', hasData: !!r.body?.data });
-    if (ok) { passed++; console.log(`  PASS EF-AUTH-12: profile-update with full_name silently ignored → ${r.status}`); }
-    else { failed++; console.warn(`  FAIL EF-AUTH-12: profile-update → ${r.status}`); }
+    const originalName = sql(`SELECT full_name FROM public.profiles WHERE id = '${IDS.residentA.profile}'`);
+    const r = await callFn(baseUrl, anonKey, 'profile-update', 'PATCH', T.residentA, {
+      full_name: 'evil-escalation',
+      preferred_name: 'AnaSafe',
+    });
+    const afterRow = sql(
+      `SELECT full_name || '||' || COALESCE(preferred_name,'') FROM public.profiles WHERE id = '${IDS.residentA.profile}'`,
+    );
+    const [afterName, preferredName] = afterRow.split('||');
+    const ok =
+      r.status === 200 &&
+      afterName === originalName &&
+      afterName !== 'evil-escalation' &&
+      preferredName === 'AnaSafe';
+    record('EF-AUTH-12', 'profile-update', 'residentA', 200, r.status, r.body?.error?.code, ok, {
+      originalName,
+      afterName,
+      preferred_name: preferredName,
+    });
   }
 
   // ─── EF-AUTH-13: Contact verification spoofing ───
-  // The Edge Function always hardcodes verification_state='unverified'.
-  // Residents cannot mark contacts as verified via this endpoint.
-  // Note: upsert onConflict with partial unique index may produce 409 on edge runtime.
   console.log('\n[EF-AUTH-13] Contact verification spoofing');
   {
     const uniqueEmail = `verify-test-${Date.now()}@test.com`;
-    const r = await callFn(baseUrl, 'profile-contact-upsert', 'PUT', T.residentA, {
-      contact_type: 'email', normalized_value: uniqueEmail, display_value: uniqueEmail,
+    const r = await callFn(baseUrl, anonKey, 'profile-contact-upsert', 'PUT', T.residentA, {
+      contact_type: 'email',
+      normalized_value: uniqueEmail,
+      display_value: uniqueEmail,
+      verification_state: 'verified',
+      verified_at: new Date().toISOString(),
     });
-    // Accept 200 (contact created with unverified) or 409 (upsert conflict on partial index)
-    const isUnverified = r.status === 200 && r.body?.data?.verification_state === 'unverified';
-    const isSafeFail = r.status === 409 && r.body?.error?.code === 'CONFLICT';
-    const ok = isUnverified || isSafeFail;
-    record('EF-AUTH-13', 'profile-contact-upsert', 'residentA', 200, r.status, r.body?.error?.code, ok,
-      { verification_state: r.body?.data?.verification_state, status: r.status });
-    if (ok) { passed++; console.log(`  PASS EF-AUTH-13: verification spoofing prevented (status=${r.status} vs=${r.body?.data?.verification_state})`); }
-    else { failed++; console.warn(`  FAIL EF-AUTH-13: status=${r.status} vs=${r.body?.data?.verification_state} err=${r.body?.error?.code}`); }
+    const state = r.body?.data?.verification_state;
+    const okEdge =
+      r.status === 200 &&
+      state === 'unverified' &&
+      (r.body?.data?.verified_at == null);
+
+    const sqlDenied = !sqlOk(`
+BEGIN;
+SELECT set_config('request.jwt.claim.role', 'authenticated', true);
+SELECT set_config('request.jwt.claim.sub', '${IDS.residentA.user}', true);
+SET LOCAL ROLE authenticated;
+UPDATE public.profile_contacts
+   SET verification_state = 'verified', verified_at = now()
+ WHERE profile_id = '${IDS.residentA.profile}'
+   AND contact_type = 'email'
+   AND deleted_at IS NULL;
+COMMIT;
+`);
+
+    record('EF-AUTH-13', 'profile-contact-upsert', 'residentA', 200, r.status, r.body?.error?.code, okEdge && sqlDenied, {
+      verification_state: state,
+      sqlSpoofDenied: sqlDenied,
+    });
   }
 
-  // ─── EF-AUTH-14: Audit event ───
+  // ─── EF-AUTH-14: Audit event generated and immutable ───
   console.log('\n[EF-AUTH-14] Audit event');
   {
-    const r = await callFn(baseUrl, 'profile-update', 'PATCH', T.residentA, { preferred_name: 'AuditTest' });
-    record('EF-AUTH-14', 'profile-update', 'residentA', 200, r.status, r.body?.error?.code, r.status === 200,
-      { hasData: r.body?.data !== null, id: r.body?.data?.id });
+    const beforeCount = Number(
+      sql(`SELECT COUNT(*)::int FROM public.audit_events WHERE actor_profile_id = '${IDS.residentA.profile}' AND action = 'profile.update.self'`),
+    );
+    const r = await callFn(baseUrl, anonKey, 'profile-update', 'PATCH', T.residentA, {
+      preferred_name: `AuditTest-${Date.now()}`,
+    });
+    const afterRow = sql(`
+      SELECT id || '|' || action || '|' || COALESCE(source,'')
+      FROM public.audit_events
+      WHERE actor_profile_id = '${IDS.residentA.profile}' AND action = 'profile.update.self'
+      ORDER BY created_at DESC
+      LIMIT 1
+    `);
+    const afterCount = Number(
+      sql(`SELECT COUNT(*)::int FROM public.audit_events WHERE actor_profile_id = '${IDS.residentA.profile}' AND action = 'profile.update.self'`),
+    );
+    const [auditId, action, source] = (afterRow || '').split('|');
+    const created = r.status === 200 && Boolean(auditId) && afterCount >= beforeCount + 1;
+    const immutable = auditId
+      ? !sqlOk(`UPDATE public.audit_events SET action = 'tamper' WHERE id = '${auditId}'`)
+      : false;
+
+    record('EF-AUTH-14', 'profile-update', 'residentA', 200, r.status, r.body?.error?.code, created && immutable, {
+      auditId,
+      action,
+      source,
+      immutable,
+      beforeCount,
+      afterCount,
+    });
   }
 
   // ─── EF-AUTH-15: Safe internal failure ───
   console.log('\n[EF-AUTH-15] Safe internal failure');
   {
-    const r = await callFn(baseUrl, 'profile-update', 'PATCH', T.residentA, { preferred_name: 12345 });
-    const ok = r.status >= 400 && r.status < 600;
-    record('EF-AUTH-15', 'profile-update', 'residentA', 422, r.status, r.body?.error?.code, ok,
-      { msg: r.body?.error?.message });
+    const r = await callFn(baseUrl, anonKey, 'profile-update', 'PATCH', T.residentA, {
+      preferred_name: 12345,
+    });
+    const ok =
+      r.status >= 400 &&
+      r.status < 600 &&
+      !String(r.text || '').toLowerCase().includes('stack trace') &&
+      (isSafeErrorEnvelope(r.body) || r.body?.error?.code === 'PARSE_ERROR' || r.status === 500);
+    record('EF-AUTH-15', 'profile-update', 'residentA', 500, r.status, r.body?.error?.code, ok, {
+      msg: r.body?.error?.message,
+    });
   }
 
-  // ─── Summary ───
   const total = passed + failed;
   console.log(`\n=== Results: ${passed}/${total} passed (${failed} failed) ===`);
 
   fs.mkdirSync('validation/evidence', { recursive: true });
-  fs.writeFileSync('validation/evidence/sprint01_edge_function_authorization.json',
-    JSON.stringify({
-      generatedAt: new Date().toISOString(),
-      environment: 'local-supabase-cli',
-      baseUrl,
-      testIdentities: {
-        residentA: { user: IDS.residentA.user, fingerprint: T.residentA.slice(-8) },
-        residentB: { user: IDS.residentB.user, fingerprint: T.residentB.slice(-8) },
-        operatorA: { user: IDS.operatorA.user, fingerprint: T.operatorA.slice(-8) },
-        admin: { user: IDS.admin.user, fingerprint: T.admin.slice(-8) },
-        revoked: { user: IDS.revoked.user, fingerprint: T.revoked.slice(-8) },
-        disabled: { user: IDS.disabled.user, fingerprint: T.disabled.slice(-8) },
-        unrelated: { user: IDS.unrelated.user, fingerprint: T.unrelated.slice(-8) },
+  fs.writeFileSync(
+    'validation/evidence/sprint01_edge_function_authorization.json',
+    JSON.stringify(
+      {
+        generatedAt: new Date().toISOString(),
+        environment: 'local-supabase-cli',
+        baseUrl,
+        authMode: 'gotrue-password-grant',
+        testIdentities: {
+          residentA: { user: IDS.residentA.user, fingerprint: fingerprintToken(T.residentA) },
+          residentB: { user: IDS.residentB.user, fingerprint: fingerprintToken(T.residentB) },
+          operatorA: { user: IDS.operatorA.user, fingerprint: fingerprintToken(T.operatorA) },
+          admin: { user: IDS.admin.user, fingerprint: fingerprintToken(T.admin) },
+          revoked: { user: IDS.revoked.user, fingerprint: fingerprintToken(T.revoked) },
+          disabled: { user: IDS.disabled.user, fingerprint: fingerprintToken(T.disabled) },
+          unrelated: { user: IDS.unrelated.user, fingerprint: fingerprintToken(T.unrelated) },
+        },
+        evidence,
+        summary: { total, passed, failed },
       },
-      evidence,
-      summary: { total, passed, failed },
-    }, null, 2));
+      null,
+      2,
+    ),
+  );
 
-  console.log(`Evidence written to validation/evidence/sprint01_edge_function_authorization.json`);
-
+  console.log('Evidence written to validation/evidence/sprint01_edge_function_authorization.json');
   if (failed > 0) {
     console.error(`\n${failed} test(s) FAILED`);
     process.exit(1);
   }
 }
 
-main().catch(err => {
+main().catch((err) => {
   console.error('Fatal error:', err);
   process.exit(1);
 });

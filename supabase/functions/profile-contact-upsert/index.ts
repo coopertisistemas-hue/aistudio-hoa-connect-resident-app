@@ -46,26 +46,62 @@ Deno.serve(async (request) => {
       .is('deleted_at', null);
   }
 
-  const { data, error } = await ctx.authClient
+  const contactSelect =
+    'id, profile_id, contact_type, normalized_value, display_value, verification_state, is_primary, is_whatsapp_capable, verification_sent_at, verified_at, invalidated_at, outdated_at, created_at, updated_at';
+
+  // Partial unique index prevents ON CONFLICT upsert; select then insert/update.
+  const { data: existing, error: existingError } = await ctx.authClient
     .from('profile_contacts')
-    .upsert({
-      profile_id: profile.id,
-      contact_type: contactType,
-      normalized_value: normalizedValue,
-      display_value: displayValue,
-      verification_state: 'unverified',
-      is_primary: body.is_primary ?? false,
-      is_whatsapp_capable: body.is_whatsapp_capable ?? contactType === 'whatsapp',
-      verification_sent_at: null,
-      verified_at: null,
-      invalidated_at: null,
-      outdated_at: null,
-      deleted_at: null,
-    }, {
-      onConflict: 'profile_id,contact_type,normalized_value',
-    })
-    .select('id, profile_id, contact_type, normalized_value, display_value, verification_state, is_primary, is_whatsapp_capable, verification_sent_at, verified_at, invalidated_at, outdated_at, created_at, updated_at')
-    .single();
+    .select('id')
+    .eq('profile_id', profile.id)
+    .eq('contact_type', contactType)
+    .eq('normalized_value', normalizedValue)
+    .is('deleted_at', null)
+    .maybeSingle();
+
+  if (existingError) {
+    return jsonError(ctx.requestId, 'TEMPORARY_UNAVAILABLE', 'Nao foi possivel consultar o contato.', 503, {
+      headers: ctx.headers,
+    });
+  }
+
+  let data;
+  let error;
+  if (existing?.id) {
+    const updated = await ctx.authClient
+      .from('profile_contacts')
+      .update({
+        display_value: displayValue,
+        is_primary: body.is_primary ?? false,
+        is_whatsapp_capable: body.is_whatsapp_capable ?? contactType === 'whatsapp',
+      })
+      .eq('id', existing.id)
+      .select(contactSelect)
+      .single();
+    data = updated.data;
+    error = updated.error;
+  } else {
+    const inserted = await ctx.authClient
+      .from('profile_contacts')
+      .insert({
+        profile_id: profile.id,
+        contact_type: contactType,
+        normalized_value: normalizedValue,
+        display_value: displayValue,
+        verification_state: 'unverified',
+        is_primary: body.is_primary ?? false,
+        is_whatsapp_capable: body.is_whatsapp_capable ?? contactType === 'whatsapp',
+        verification_sent_at: null,
+        verified_at: null,
+        invalidated_at: null,
+        outdated_at: null,
+        deleted_at: null,
+      })
+      .select(contactSelect)
+      .single();
+    data = inserted.data;
+    error = inserted.error;
+  }
 
   if (error) {
     return jsonError(ctx.requestId, 'CONFLICT', 'Nao foi possivel salvar o contato.', 409, { headers: ctx.headers });

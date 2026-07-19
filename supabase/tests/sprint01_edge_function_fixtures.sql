@@ -31,6 +31,39 @@ VALUES
   )
 ON CONFLICT (id) DO NOTHING;
 
+INSERT INTO auth.identities (
+  id,
+  user_id,
+  identity_data,
+  provider,
+  provider_id,
+  last_sign_in_at,
+  created_at,
+  updated_at
+)
+SELECT
+  gen_random_uuid(),
+  u.id,
+  jsonb_build_object('sub', u.id::text, 'email', u.email),
+  'email',
+  u.id::text,
+  now(),
+  now(),
+  now()
+FROM auth.users AS u
+WHERE u.id IN (
+  '10000000-0000-0000-0000-000000000011',
+  '10000000-0000-0000-0000-000000000022',
+  '10000000-0000-0000-0000-000000000033',
+  '10000000-0000-0000-0000-000000000044'
+)
+AND NOT EXISTS (
+  SELECT 1
+  FROM auth.identities AS i
+  WHERE i.user_id = u.id
+    AND i.provider = 'email'
+);
+
 INSERT INTO public.tenants (id, legal_name, display_name, slug, status)
 VALUES ('11111111-1111-1111-1111-222222222222', 'Assoc Residencial B', 'Residencial B', 'residencial-b', 'active')
 ON CONFLICT (id) DO NOTHING;

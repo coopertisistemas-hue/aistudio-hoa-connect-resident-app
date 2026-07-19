@@ -87,16 +87,20 @@ END $$;
 
 DO $$
 DECLARE
-  all_tenants integer;
+  visible_tenants integer;
+  total_tenants integer;
 BEGIN
+  SELECT COUNT(*) INTO total_tenants FROM public.tenants;
+
   PERFORM set_config('request.jwt.claim.role', 'authenticated', true);
   PERFORM set_config('request.jwt.claim.sub', '10000000-0000-0000-0000-000000000003', true);
   SET LOCAL ROLE authenticated;
 
-  SELECT COUNT(*) INTO all_tenants
+  SELECT COUNT(*) INTO visible_tenants
   FROM public.tenants;
-  IF all_tenants <> 1 THEN
-    RAISE EXCEPTION 'SPR1-RLS-07 failed: platform admin should read all tenants';
+  IF visible_tenants < 1 OR visible_tenants <> total_tenants THEN
+    RAISE EXCEPTION 'SPR1-RLS-07 failed: platform admin should read all tenants (visible=%, total=%)',
+      visible_tenants, total_tenants;
   END IF;
 
   RESET ROLE;
