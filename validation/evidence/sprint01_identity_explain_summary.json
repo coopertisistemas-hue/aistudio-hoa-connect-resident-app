@@ -1,0 +1,33 @@
+{
+  "generatedAt": "2026-07-19",
+  "environment": "local-supabase-cli",
+  "fixtureRowCounts": {
+    "tenants": 50,
+    "properties": 501,
+    "profiles": 3253,
+    "tenant_memberships": 251,
+    "residence_memberships": 3001,
+    "profile_contacts": 8859,
+    "audit_events": 10000
+  },
+  "seedDurationSeconds": 14.3,
+  "queries": [
+    { "id": "PERF-01", "index": "idx_profiles_user_id", "method": "Index Scan", "planningMs": 0.37, "executionMs": 0.10, "buffers": 3, "verdict": "OPTIMAL" },
+    { "id": "PERF-02", "index": null, "method": "Hash Join + Seq Scan", "planningMs": 0.50, "executionMs": 0.09, "buffers": 5, "verdict": "ACCEPTABLE", "note": "Small table (251 rows), index expected at scale >1000 rows" },
+    { "id": "PERF-03", "index": "idx_residence_members_profile_active", "method": "Index Scan + Nested Loop", "planningMs": 0.39, "executionMs": 0.06, "buffers": 8, "verdict": "OPTIMAL" },
+    { "id": "PERF-04", "index": "idx_properties_tenant_status", "method": "Bitmap Index Scan", "planningMs": 0.05, "executionMs": 0.05, "buffers": 5, "verdict": "OPTIMAL" },
+    { "id": "PERF-05", "index": "properties_pkey (Memoize)", "method": "Nested Loop + Seq Scan rm", "planningMs": 0.27, "executionMs": 31.10, "buffers": 1769, "verdict": "ACCEPTABLE", "note": "Administrative query, Memoize caches property lookups" },
+    { "id": "PERF-06", "index": "idx_tenant_members_tenant_status", "method": "Index Scan", "planningMs": 0.06, "executionMs": 0.02, "buffers": 1, "verdict": "OPTIMAL" },
+    { "id": "PERF-07", "index": "idx_profile_contacts_profile_active", "method": "Index Scan", "planningMs": 0.26, "executionMs": 0.05, "buffers": 8, "verdict": "OPTIMAL" },
+    { "id": "PERF-08", "index": "idx_profile_contacts_normalized_active", "method": "Index Scan", "planningMs": 0.04, "executionMs": 0.03, "buffers": 2, "verdict": "OPTIMAL" },
+    { "id": "PERF-09", "index": null, "method": "Function (SECURITY DEFINER)", "planningMs": 0.01, "executionMs": 0.33, "buffers": null, "verdict": "OPTIMAL" },
+    { "id": "PERF-10", "index": null, "method": "Function (SECURITY DEFINER)", "planningMs": 0.01, "executionMs": 1.04, "buffers": 212, "verdict": "OPTIMAL" },
+    { "id": "PERF-11", "index": "idx_audit_events_tenant_created", "method": "Index Scan", "planningMs": 0.18, "executionMs": 0.03, "buffers": 3, "verdict": "OPTIMAL" },
+    { "id": "PERF-12", "index": "idx_audit_events_actor_created", "method": "Index Scan", "planningMs": 0.04, "executionMs": 0.32, "buffers": 52, "verdict": "OPTIMAL" }
+  ],
+  "acceptableSequentialScans": [
+    { "query": "PERF-02", "reason": "tenant_members table is small (251 rows). Index expected to be selected at ~1000+ rows." },
+    { "query": "PERF-05", "reason": "Administrative ADR-10 query. Uses Memoize cache for properties. No index on residence_members.status alone, but Seq Scan is acceptable at current scale." }
+  ],
+  "blockingIssues": []
+}
