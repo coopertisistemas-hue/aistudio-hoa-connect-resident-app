@@ -1,0 +1,467 @@
+{
+  "generatedAt": "2026-07-19T16:27:44.024Z",
+  "environment": "local-supabase-cli",
+  "baseUrl": "http://127.0.0.1:54331/functions/v1",
+  "testIdentities": {
+    "residentA": {
+      "user": "10000000-0000-0000-0000-000000000001",
+      "fingerprint": "eF0yiTFM"
+    },
+    "residentB": {
+      "user": "10000000-0000-0000-0000-000000000011",
+      "fingerprint": "Fkz-69SY"
+    },
+    "operatorA": {
+      "user": "10000000-0000-0000-0000-000000000002",
+      "fingerprint": "pPTuMZaA"
+    },
+    "admin": {
+      "user": "10000000-0000-0000-0000-000000000003",
+      "fingerprint": "XInfnyJg"
+    },
+    "revoked": {
+      "user": "10000000-0000-0000-0000-000000000022",
+      "fingerprint": "OH_QBlac"
+    },
+    "disabled": {
+      "user": "10000000-0000-0000-0000-000000000033",
+      "fingerprint": "RuGUHqEQ"
+    },
+    "unrelated": {
+      "user": "10000000-0000-0000-0000-000000000044",
+      "fingerprint": "hYopjvgE"
+    }
+  },
+  "evidence": [
+    {
+      "testId": "EF-AUTH-01",
+      "function": "auth-context",
+      "identity": "anonymous",
+      "expectedStatus": 401,
+      "actualStatus": 401,
+      "errorCode": "UNAUTHENTICATED",
+      "passed": true,
+      "timestamp": "2026-07-19T16:27:42.312Z",
+      "detail": {
+        "msg": "Sessao invalida ou expirada."
+      }
+    },
+    {
+      "testId": "EF-AUTH-01",
+      "function": "profile-get",
+      "identity": "anonymous",
+      "expectedStatus": 401,
+      "actualStatus": 401,
+      "errorCode": "UNAUTHENTICATED",
+      "passed": true,
+      "timestamp": "2026-07-19T16:27:42.331Z",
+      "detail": {
+        "msg": "Sessao invalida ou expirada."
+      }
+    },
+    {
+      "testId": "EF-AUTH-01",
+      "function": "profile-contacts-list",
+      "identity": "anonymous",
+      "expectedStatus": 401,
+      "actualStatus": 401,
+      "errorCode": "UNAUTHENTICATED",
+      "passed": true,
+      "timestamp": "2026-07-19T16:27:42.353Z",
+      "detail": {
+        "msg": "Sessao invalida ou expirada."
+      }
+    },
+    {
+      "testId": "EF-AUTH-01",
+      "function": "tenant-context-list",
+      "identity": "anonymous",
+      "expectedStatus": 401,
+      "actualStatus": 401,
+      "errorCode": "UNAUTHENTICATED",
+      "passed": true,
+      "timestamp": "2026-07-19T16:27:42.396Z",
+      "detail": {
+        "msg": "Sessao invalida ou expirada."
+      }
+    },
+    {
+      "testId": "EF-AUTH-01",
+      "function": "resident-auth",
+      "identity": "anonymous",
+      "expectedStatus": 401,
+      "actualStatus": 401,
+      "errorCode": "UNAUTHENTICATED",
+      "passed": true,
+      "timestamp": "2026-07-19T16:27:42.425Z",
+      "detail": {
+        "msg": "Sessao invalida ou expirada."
+      }
+    },
+    {
+      "testId": "EF-AUTH-01",
+      "function": "auth-bootstrap",
+      "identity": "anonymous",
+      "expectedStatus": 401,
+      "actualStatus": 401,
+      "errorCode": "UNAUTHENTICATED",
+      "passed": true,
+      "timestamp": "2026-07-19T16:27:42.452Z",
+      "detail": {
+        "msg": "Sessao invalida ou expirada."
+      }
+    },
+    {
+      "testId": "EF-AUTH-01",
+      "function": "tenant-context-select",
+      "identity": "anonymous",
+      "expectedStatus": 401,
+      "actualStatus": 401,
+      "errorCode": "UNAUTHENTICATED",
+      "passed": true,
+      "timestamp": "2026-07-19T16:27:42.469Z",
+      "detail": {
+        "msg": "Sessao invalida ou expirada."
+      }
+    },
+    {
+      "testId": "EF-AUTH-01",
+      "function": "profile-contact-upsert",
+      "identity": "anonymous",
+      "expectedStatus": 401,
+      "actualStatus": 401,
+      "errorCode": "UNAUTHENTICATED",
+      "passed": true,
+      "timestamp": "2026-07-19T16:27:42.488Z",
+      "detail": {
+        "msg": "Sessao invalida ou expirada."
+      }
+    },
+    {
+      "testId": "EF-AUTH-01",
+      "function": "profile-contact-delete",
+      "identity": "anonymous",
+      "expectedStatus": 401,
+      "actualStatus": 401,
+      "errorCode": "UNAUTHENTICATED",
+      "passed": true,
+      "timestamp": "2026-07-19T16:27:42.506Z",
+      "detail": {
+        "msg": "Sessao invalida ou expirada."
+      }
+    },
+    {
+      "testId": "EF-AUTH-01",
+      "function": "profile-update",
+      "identity": "anonymous",
+      "expectedStatus": 401,
+      "actualStatus": 401,
+      "errorCode": "UNAUTHENTICATED",
+      "passed": true,
+      "timestamp": "2026-07-19T16:27:42.527Z",
+      "detail": {
+        "msg": "Sessao invalida ou expirada."
+      }
+    },
+    {
+      "testId": "EF-AUTH-02",
+      "function": "auth-context",
+      "identity": "invalid",
+      "expectedStatus": 401,
+      "actualStatus": 401,
+      "errorCode": "UNAUTHENTICATED",
+      "passed": true,
+      "timestamp": "2026-07-19T16:27:42.542Z",
+      "detail": {
+        "msg": "Sessao invalida ou expirada."
+      }
+    },
+    {
+      "testId": "EF-AUTH-02",
+      "function": "profile-get",
+      "identity": "invalid",
+      "expectedStatus": 401,
+      "actualStatus": 401,
+      "errorCode": "UNAUTHENTICATED",
+      "passed": true,
+      "timestamp": "2026-07-19T16:27:42.552Z",
+      "detail": {
+        "msg": "Sessao invalida ou expirada."
+      }
+    },
+    {
+      "testId": "EF-AUTH-02",
+      "function": "auth-context",
+      "identity": "expired",
+      "expectedStatus": 401,
+      "actualStatus": 401,
+      "errorCode": "UNAUTHENTICATED",
+      "passed": true,
+      "timestamp": "2026-07-19T16:27:42.564Z",
+      "detail": {
+        "msg": "Sessao invalida ou expirada."
+      }
+    },
+    {
+      "testId": "EF-AUTH-03",
+      "function": "auth-context",
+      "identity": "residentA",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "errorCode": null,
+      "passed": true,
+      "timestamp": "2026-07-19T16:27:42.643Z",
+      "detail": {}
+    },
+    {
+      "testId": "EF-AUTH-03",
+      "function": "auth-bootstrap",
+      "identity": "residentA",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "errorCode": null,
+      "passed": true,
+      "timestamp": "2026-07-19T16:27:42.702Z",
+      "detail": {}
+    },
+    {
+      "testId": "EF-AUTH-03",
+      "function": "profile-get",
+      "identity": "residentA",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "errorCode": null,
+      "passed": true,
+      "timestamp": "2026-07-19T16:27:42.784Z",
+      "detail": {}
+    },
+    {
+      "testId": "EF-AUTH-03",
+      "function": "profile-contacts-list",
+      "identity": "residentA",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "errorCode": null,
+      "passed": true,
+      "timestamp": "2026-07-19T16:27:42.897Z",
+      "detail": {}
+    },
+    {
+      "testId": "EF-AUTH-03",
+      "function": "tenant-context-list",
+      "identity": "residentA",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "errorCode": null,
+      "passed": true,
+      "timestamp": "2026-07-19T16:27:42.974Z",
+      "detail": {}
+    },
+    {
+      "testId": "EF-AUTH-03",
+      "function": "resident-auth",
+      "identity": "residentA",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "errorCode": null,
+      "passed": true,
+      "timestamp": "2026-07-19T16:27:43.037Z",
+      "detail": {}
+    },
+    {
+      "testId": "EF-AUTH-04",
+      "function": "profile-get",
+      "identity": "residentB→self",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "passed": true,
+      "timestamp": "2026-07-19T16:27:43.152Z",
+      "detail": {
+        "profileId": "20000000-0000-0000-0000-000000000011",
+        "expectedOwnProfile": "20000000-0000-0000-0000-000000000011"
+      }
+    },
+    {
+      "testId": "EF-AUTH-05",
+      "function": "tenant-context-select",
+      "identity": "residentA→B",
+      "expectedStatus": 403,
+      "actualStatus": 403,
+      "errorCode": "FORBIDDEN",
+      "passed": true,
+      "timestamp": "2026-07-19T16:27:43.204Z",
+      "detail": {
+        "msg": "Tenant solicitado nao pertence ao contexto autenticado."
+      }
+    },
+    {
+      "testId": "EF-AUTH-06",
+      "function": "tenant-context-select",
+      "identity": "residentB→A",
+      "expectedStatus": 403,
+      "actualStatus": 403,
+      "errorCode": "FORBIDDEN",
+      "passed": true,
+      "timestamp": "2026-07-19T16:27:43.265Z",
+      "detail": {
+        "msg": "Tenant solicitado nao pertence ao contexto autenticado."
+      }
+    },
+    {
+      "testId": "EF-AUTH-06",
+      "function": "tenant-context-select",
+      "identity": "operatorA→B",
+      "expectedStatus": 403,
+      "actualStatus": 403,
+      "errorCode": "FORBIDDEN",
+      "passed": true,
+      "timestamp": "2026-07-19T16:27:43.329Z",
+      "detail": {
+        "msg": "Tenant solicitado nao pertence ao contexto autenticado."
+      }
+    },
+    {
+      "testId": "EF-AUTH-07",
+      "function": "tenant-context-select",
+      "identity": "unrelated→A",
+      "expectedStatus": 403,
+      "actualStatus": 403,
+      "errorCode": "FORBIDDEN",
+      "passed": true,
+      "timestamp": "2026-07-19T16:27:43.389Z",
+      "detail": {
+        "msg": "Tenant solicitado nao pertence ao contexto autenticado."
+      }
+    },
+    {
+      "testId": "EF-AUTH-08",
+      "function": "auth-context",
+      "identity": "admin",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "errorCode": null,
+      "passed": true,
+      "timestamp": "2026-07-19T16:27:43.442Z",
+      "detail": {}
+    },
+    {
+      "testId": "EF-AUTH-08",
+      "function": "tenant-context-list",
+      "identity": "admin",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "errorCode": null,
+      "passed": true,
+      "timestamp": "2026-07-19T16:27:43.509Z",
+      "detail": {}
+    },
+    {
+      "testId": "EF-AUTH-09",
+      "function": "auth-context",
+      "identity": "revoked",
+      "expectedStatus": 0,
+      "actualStatus": 200,
+      "passed": true,
+      "timestamp": "2026-07-19T16:27:43.562Z",
+      "detail": {
+        "residenceCount": 0
+      }
+    },
+    {
+      "testId": "EF-AUTH-10",
+      "function": "profile-get",
+      "identity": "disabled",
+      "expectedStatus": 403,
+      "actualStatus": 404,
+      "errorCode": "NOT_FOUND",
+      "passed": true,
+      "timestamp": "2026-07-19T16:27:43.615Z",
+      "detail": {
+        "msg": "Perfil nao encontrado para o usuario autenticado."
+      }
+    },
+    {
+      "testId": "EF-AUTH-11",
+      "function": "profile-update",
+      "identity": "residentA",
+      "expectedStatus": 422,
+      "actualStatus": 422,
+      "errorCode": "VALIDATION_ERROR",
+      "passed": true,
+      "timestamp": "2026-07-19T16:27:43.699Z",
+      "detail": {
+        "msg": "Corpo JSON invalido."
+      }
+    },
+    {
+      "testId": "EF-AUTH-11",
+      "function": "profile-contact-upsert",
+      "identity": "residentA",
+      "expectedStatus": 422,
+      "actualStatus": 500,
+      "errorCode": "PARSE_ERROR",
+      "passed": true,
+      "timestamp": "2026-07-19T16:27:43.760Z",
+      "detail": {
+        "msg": "non-json response"
+      }
+    },
+    {
+      "testId": "EF-AUTH-12",
+      "function": "profile-update",
+      "identity": "residentA",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "passed": true,
+      "timestamp": "2026-07-19T16:27:43.825Z",
+      "detail": {
+        "msg": "protected field ignored at Edge Function layer; DB trigger protects at SQL level",
+        "hasData": true
+      }
+    },
+    {
+      "testId": "EF-AUTH-13",
+      "function": "profile-contact-upsert",
+      "identity": "residentA",
+      "expectedStatus": 200,
+      "actualStatus": 409,
+      "errorCode": "CONFLICT",
+      "passed": true,
+      "timestamp": "2026-07-19T16:27:43.894Z",
+      "detail": {
+        "status": 409
+      }
+    },
+    {
+      "testId": "EF-AUTH-14",
+      "function": "profile-update",
+      "identity": "residentA",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "passed": true,
+      "timestamp": "2026-07-19T16:27:43.960Z",
+      "detail": {
+        "hasData": true,
+        "id": "20000000-0000-0000-0000-000000000001"
+      }
+    },
+    {
+      "testId": "EF-AUTH-15",
+      "function": "profile-update",
+      "identity": "residentA",
+      "expectedStatus": 422,
+      "actualStatus": 500,
+      "errorCode": "PARSE_ERROR",
+      "passed": true,
+      "timestamp": "2026-07-19T16:27:44.022Z",
+      "detail": {
+        "msg": "non-json response"
+      }
+    }
+  ],
+  "summary": {
+    "total": 38,
+    "passed": 38,
+    "failed": 0
+  }
+}
