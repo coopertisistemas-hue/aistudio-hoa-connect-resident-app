@@ -1,0 +1,52 @@
+{
+  "wave": "2.1",
+  "topic": "Association Domain Foundation Extension",
+  "executed_at": "2026-07-20T11:28:16Z",
+  "status": "PASS",
+  "migrations": [
+    "supabase/migrations/20260720090000_sprint02_wave21_enums.sql",
+    "supabase/migrations/20260720100000_sprint02_wave21_association_domain.sql"
+  ],
+  "tables_added": [
+    "public.association_details",
+    "public.association_settings_private"
+  ],
+  "enums_extended": [
+    "public.tenant_role (+ association_collector)",
+    "public.tenant_permission (+ 12 permission values)"
+  ],
+  "gates": [
+    { "id": "SPR2-ASSOC-01", "name": "Tenant A association_details 1:1 seed count", "passed": true },
+    { "id": "SPR2-ASSOC-02", "name": "Tenant A association_settings_private 1:1 seed count", "passed": true },
+    { "id": "SPR2-ASSOC-03", "name": "Duplicate tenant_id insert rejection", "passed": true },
+    { "id": "SPR2-ASSOC-04", "name": "Global partial unique registration_number rejection", "passed": true },
+    { "id": "SPR2-ASSOC-05", "name": "Settings allow-list invalid key rejection", "passed": true },
+    { "id": "SPR2-ASSOC-06", "name": "Settings expiry hours out-of-range rejection", "passed": true },
+    { "id": "SPR2-ASSOC-07", "name": "Enabled modules allow-list invalid module rejection", "passed": true },
+    { "id": "SPR2-ASSOC-08", "name": "association_details tenant_id immutability", "passed": true },
+    { "id": "SPR2-ASSOC-09", "name": "association_settings_private tenant_id immutability", "passed": true },
+    { "id": "SPR2-RLS-ASSOC-01", "name": "Resident A reads Tenant A association_details", "passed": true },
+    { "id": "SPR2-RLS-ASSOC-02", "name": "Resident A denied Tenant B association_details", "passed": true },
+    { "id": "SPR2-RLS-ASSOC-03", "name": "Resident A denied association_settings_private", "passed": true },
+    { "id": "SPR2-RLS-ASSOC-04", "name": "Operator A reads Tenant A association_details", "passed": true },
+    { "id": "SPR2-RLS-ASSOC-05", "name": "Operator A denied association_settings_private", "passed": true },
+    { "id": "SPR2-RLS-ASSOC-06", "name": "Collector A reads Tenant A association_details", "passed": true },
+    { "id": "SPR2-RLS-ASSOC-07", "name": "Collector A denied Tenant B association_details", "passed": true },
+    { "id": "SPR2-RLS-ASSOC-08", "name": "Admin B reads Tenant B association_details", "passed": true },
+    { "id": "SPR2-RLS-ASSOC-09", "name": "Admin B reads Tenant B association_settings_private", "passed": true },
+    { "id": "SPR2-RLS-ASSOC-10", "name": "Admin B denied Tenant A association_settings_private", "passed": true },
+    { "id": "SPR2-RLS-ASSOC-11", "name": "Platform admin reads all association_details", "passed": true },
+    { "id": "SPR2-RLS-ASSOC-12", "name": "Platform admin reads all association_settings_private", "passed": true },
+    { "id": "SPR2-GRANT-01", "name": "No table write grants to authenticated on new tables", "passed": true },
+    { "id": "SPR2-GRANT-02", "name": "Direct write attempts denied at grant layer", "passed": true }
+  ],
+  "regression_suite": {
+    "typecheck": "PASS (exit 0)",
+    "build": "PASS (exit 0)",
+    "sprint1_foundation": "PASS (exit 0)",
+    "edge_function_auth": "PASS (exit 0)",
+    "d2_regression": "PASS (exit 0)",
+    "adr11_compatibility": "PASS (exit 0)",
+    "d2_namespace_guard": "PASS (exit 0)"
+  }
+}

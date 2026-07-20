@@ -34,6 +34,113 @@ export type Database = {
   }
   public: {
     Tables: {
+      association_details: {
+        Row: {
+          address_line1: string | null
+          address_line2: string | null
+          city: string | null
+          created_at: string
+          district: string | null
+          email: string | null
+          enabled_modules: Json
+          id: string
+          phone: string | null
+          postal_code: string | null
+          registration_number: string | null
+          settings: Json
+          state: string | null
+          tenant_id: string
+          trade_name: string | null
+          updated_at: string
+        }
+        Insert: {
+          address_line1?: string | null
+          address_line2?: string | null
+          city?: string | null
+          created_at?: string
+          district?: string | null
+          email?: string | null
+          enabled_modules?: Json
+          id?: string
+          phone?: string | null
+          postal_code?: string | null
+          registration_number?: string | null
+          settings?: Json
+          state?: string | null
+          tenant_id: string
+          trade_name?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address_line1?: string | null
+          address_line2?: string | null
+          city?: string | null
+          created_at?: string
+          district?: string | null
+          email?: string | null
+          enabled_modules?: Json
+          id?: string
+          phone?: string | null
+          postal_code?: string | null
+          registration_number?: string | null
+          settings?: Json
+          state?: string | null
+          tenant_id?: string
+          trade_name?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "association_details_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      association_settings_private: {
+        Row: {
+          created_at: string
+          id: string
+          settings: Json
+          tenant_id: string
+          updated_at: string
+          updated_by_profile_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          settings?: Json
+          tenant_id: string
+          updated_at?: string
+          updated_by_profile_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          settings?: Json
+          tenant_id?: string
+          updated_at?: string
+          updated_by_profile_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "association_settings_private_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "association_settings_private_updated_by_profile_id_fkey"
+            columns: ["updated_by_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_events: {
         Row: {
           action: string
@@ -74,79 +181,22 @@ export type Database = {
           source?: string
           tenant_id?: string | null
         }
-        Relationships: []
-      }
-      notifications: {
-        Row: {
-          body_key: string
-          category: string
-          created_at: string
-          id: string
-          params: Json
-          profile_id: string
-          read_at: string | null
-          tenant_id: string
-          title_key: string
-        }
-        Insert: {
-          body_key: string
-          category: string
-          created_at?: string
-          id: string
-          params?: Json
-          profile_id: string
-          read_at?: string | null
-          tenant_id: string
-          title_key: string
-        }
-        Update: {
-          body_key?: string
-          category?: string
-          created_at?: string
-          id?: string
-          params?: Json
-          profile_id?: string
-          read_at?: string | null
-          tenant_id?: string
-          title_key?: string
-        }
         Relationships: [
           {
-            foreignKeyName: "notifications_profile_id_fkey"
-            columns: ["profile_id"]
+            foreignKeyName: "audit_events_actor_profile_id_fkey"
+            columns: ["actor_profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "notifications_tenant_id_fkey"
+            foreignKeyName: "audit_events_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
         ]
-      }
-      platform_admins: {
-        Row: {
-          active: boolean
-          created_at: string
-          id: string
-          user_id: string
-        }
-        Insert: {
-          active?: boolean
-          created_at?: string
-          id: string
-          user_id: string
-        }
-        Update: {
-          active?: boolean
-          created_at?: string
-          id?: string
-          user_id?: string
-        }
-        Relationships: []
       }
       platform_role_assignments: {
         Row: {
@@ -176,60 +226,9 @@ export type Database = {
           status?: Database["public"]["Enums"]["platform_assignment_status"]
           updated_at?: string
         }
-        Relationships: []
-      }
-      profile_contacts: {
-        Row: {
-          communication_preference_flags: Json
-          contact_type: string
-          created_at: string
-          deleted_at: string | null
-          display_value: string
-          id: string
-          invalidated_at: string | null
-          normalized_value: string
-          outdated_at: string | null
-          profile_id: string
-          updated_at: string
-          verification_sent_at: string | null
-          verification_state: string
-          verified_at: string | null
-        }
-        Insert: {
-          communication_preference_flags?: Json
-          contact_type: string
-          created_at?: string
-          deleted_at?: string | null
-          display_value: string
-          id: string
-          invalidated_at?: string | null
-          normalized_value: string
-          outdated_at?: string | null
-          profile_id: string
-          updated_at?: string
-          verification_sent_at?: string | null
-          verification_state: string
-          verified_at?: string | null
-        }
-        Update: {
-          communication_preference_flags?: Json
-          contact_type?: string
-          created_at?: string
-          deleted_at?: string | null
-          display_value?: string
-          id?: string
-          invalidated_at?: string | null
-          normalized_value?: string
-          outdated_at?: string | null
-          profile_id?: string
-          updated_at?: string
-          verification_sent_at?: string | null
-          verification_state?: string
-          verified_at?: string | null
-        }
         Relationships: [
           {
-            foreignKeyName: "profile_contacts_profile_id_fkey"
+            foreignKeyName: "platform_role_assignments_profile_id_fkey"
             columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
@@ -237,41 +236,62 @@ export type Database = {
           },
         ]
       }
-      profile_correction_audit: {
+      profile_contacts: {
         Row: {
-          actor_user_id: string
+          contact_type: Database["public"]["Enums"]["contact_type"]
           created_at: string
-          field_name: string
+          deleted_at: string | null
+          display_value: string
           id: string
-          new_value: string
-          old_value: string
-          reason: string
-          target_profile_id: string
+          invalidated_at: string | null
+          is_primary: boolean
+          is_whatsapp_capable: boolean
+          normalized_value: string
+          outdated_at: string | null
+          profile_id: string
+          updated_at: string
+          verification_sent_at: string | null
+          verification_state: Database["public"]["Enums"]["verification_state"]
+          verified_at: string | null
         }
         Insert: {
-          actor_user_id: string
+          contact_type: Database["public"]["Enums"]["contact_type"]
           created_at?: string
-          field_name: string
+          deleted_at?: string | null
+          display_value: string
           id?: string
-          new_value: string
-          old_value: string
-          reason: string
-          target_profile_id: string
+          invalidated_at?: string | null
+          is_primary?: boolean
+          is_whatsapp_capable?: boolean
+          normalized_value: string
+          outdated_at?: string | null
+          profile_id: string
+          updated_at?: string
+          verification_sent_at?: string | null
+          verification_state?: Database["public"]["Enums"]["verification_state"]
+          verified_at?: string | null
         }
         Update: {
-          actor_user_id?: string
+          contact_type?: Database["public"]["Enums"]["contact_type"]
           created_at?: string
-          field_name?: string
+          deleted_at?: string | null
+          display_value?: string
           id?: string
-          new_value?: string
-          old_value?: string
-          reason?: string
-          target_profile_id?: string
+          invalidated_at?: string | null
+          is_primary?: boolean
+          is_whatsapp_capable?: boolean
+          normalized_value?: string
+          outdated_at?: string | null
+          profile_id?: string
+          updated_at?: string
+          verification_sent_at?: string | null
+          verification_state?: Database["public"]["Enums"]["verification_state"]
+          verified_at?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "profile_correction_audit_target_profile_id_fkey"
-            columns: ["target_profile_id"]
+            foreignKeyName: "profile_contacts_profile_id_fkey"
+            columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -309,7 +329,15 @@ export type Database = {
           profile_id?: string
           revoked_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profile_devices_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profile_preferences: {
         Row: {
@@ -336,48 +364,50 @@ export type Database = {
           timezone?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profile_preferences_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
-          birth_date: string
+          avatar_url: string | null
           created_at: string
-          display_name: string | null
-          document: string
           full_name: string
           id: string
-          photo_path: string | null
+          locale: string
           preferred_name: string | null
-          pronoun_preference: string | null
-          status: string
+          status: Database["public"]["Enums"]["profile_status"]
+          timezone: string
           updated_at: string
           user_id: string
         }
         Insert: {
-          birth_date: string
+          avatar_url?: string | null
           created_at?: string
-          display_name?: string | null
-          document: string
           full_name: string
-          id: string
-          photo_path?: string | null
+          id?: string
+          locale?: string
           preferred_name?: string | null
-          pronoun_preference?: string | null
-          status?: string
+          status?: Database["public"]["Enums"]["profile_status"]
+          timezone?: string
           updated_at?: string
           user_id: string
         }
         Update: {
-          birth_date?: string
+          avatar_url?: string | null
           created_at?: string
-          display_name?: string | null
-          document?: string
           full_name?: string
           id?: string
-          photo_path?: string | null
+          locale?: string
           preferred_name?: string | null
-          pronoun_preference?: string | null
-          status?: string
+          status?: Database["public"]["Enums"]["profile_status"]
+          timezone?: string
           updated_at?: string
           user_id?: string
         }
@@ -385,22 +415,61 @@ export type Database = {
       }
       properties: {
         Row: {
-          address: string
+          address_line1: string
+          address_line2: string | null
+          block_identifier: string | null
+          city: string
+          country: string
           created_at: string
+          district: string | null
           id: string
+          label: string
+          metadata: Json
+          nickname: string | null
+          postal_code: string | null
+          state: string
+          status: Database["public"]["Enums"]["property_status"]
           tenant_id: string
+          unit_identifier: string
+          updated_at: string
         }
         Insert: {
-          address: string
+          address_line1: string
+          address_line2?: string | null
+          block_identifier?: string | null
+          city: string
+          country?: string
           created_at?: string
-          id: string
+          district?: string | null
+          id?: string
+          label: string
+          metadata?: Json
+          nickname?: string | null
+          postal_code?: string | null
+          state: string
+          status?: Database["public"]["Enums"]["property_status"]
           tenant_id: string
+          unit_identifier: string
+          updated_at?: string
         }
         Update: {
-          address?: string
+          address_line1?: string
+          address_line2?: string | null
+          block_identifier?: string | null
+          city?: string
+          country?: string
           created_at?: string
+          district?: string | null
           id?: string
+          label?: string
+          metadata?: Json
+          nickname?: string | null
+          postal_code?: string | null
+          state?: string
+          status?: Database["public"]["Enums"]["property_status"]
           tenant_id?: string
+          unit_identifier?: string
+          updated_at?: string
         }
         Relationships: [
           {
@@ -415,33 +484,45 @@ export type Database = {
       residence_members: {
         Row: {
           created_at: string
+          end_date: string | null
           id: string
           is_primary: boolean
           profile_id: string
           property_id: string
-          role: string
-          status: string
+          revoked_at: string | null
+          role: Database["public"]["Enums"]["residence_role"]
+          start_date: string | null
+          status: Database["public"]["Enums"]["residence_membership_status"]
           tenant_id: string
+          updated_at: string
         }
         Insert: {
           created_at?: string
-          id: string
+          end_date?: string | null
+          id?: string
           is_primary?: boolean
           profile_id: string
           property_id: string
-          role: string
-          status?: string
+          revoked_at?: string | null
+          role: Database["public"]["Enums"]["residence_role"]
+          start_date?: string | null
+          status?: Database["public"]["Enums"]["residence_membership_status"]
           tenant_id: string
+          updated_at?: string
         }
         Update: {
           created_at?: string
+          end_date?: string | null
           id?: string
           is_primary?: boolean
           profile_id?: string
           property_id?: string
-          role?: string
-          status?: string
+          revoked_at?: string | null
+          role?: Database["public"]["Enums"]["residence_role"]
+          start_date?: string | null
+          status?: Database["public"]["Enums"]["residence_membership_status"]
           tenant_id?: string
+          updated_at?: string
         }
         Relationships: [
           {
@@ -467,183 +548,48 @@ export type Database = {
           },
         ]
       }
-      support_messages: {
+      tenant_members: {
         Row: {
-          content: string
-          created_at: string
-          delivery_sequence: number
-          id: string
-          property_id: string
-          resident_access_revoked: boolean
-          resident_profile_id: string
-          resident_user_id: string
-          sender_profile_id: string | null
-          sender_type: string
-          support_request_id: string
-          tenant_id: string
-        }
-        Insert: {
-          content: string
-          created_at?: string
-          delivery_sequence?: never
-          id: string
-          property_id: string
-          resident_access_revoked?: boolean
-          resident_profile_id: string
-          resident_user_id: string
-          sender_profile_id?: string | null
-          sender_type: string
-          support_request_id: string
-          tenant_id: string
-        }
-        Update: {
-          content?: string
-          created_at?: string
-          delivery_sequence?: never
-          id?: string
-          property_id?: string
-          resident_access_revoked?: boolean
-          resident_profile_id?: string
-          resident_user_id?: string
-          sender_profile_id?: string | null
-          sender_type?: string
-          support_request_id?: string
-          tenant_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "support_messages_identity_projection_fk"
-            columns: [
-              "support_request_id",
-              "tenant_id",
-              "property_id",
-              "resident_profile_id",
-            ]
-            isOneToOne: false
-            referencedRelation: "support_requests"
-            referencedColumns: ["id", "tenant_id", "property_id", "profile_id"]
-          },
-          {
-            foreignKeyName: "support_messages_property_id_fkey"
-            columns: ["property_id"]
-            isOneToOne: false
-            referencedRelation: "properties"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "support_messages_request_fk"
-            columns: ["support_request_id"]
-            isOneToOne: false
-            referencedRelation: "support_requests"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "support_messages_resident_profile_id_fkey"
-            columns: ["resident_profile_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "support_messages_sender_profile_id_fkey"
-            columns: ["sender_profile_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "support_messages_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      support_requests: {
-        Row: {
-          category: string
           created_at: string
           id: string
+          joined_at: string
           profile_id: string
-          property_id: string
-          protocol: string
-          status: string
-          subject: string
+          revoked_at: string | null
+          role: Database["public"]["Enums"]["tenant_role"]
+          status: Database["public"]["Enums"]["tenant_membership_status"]
           tenant_id: string
+          updated_at: string
         }
         Insert: {
-          category: string
-          created_at?: string
-          id: string
-          profile_id: string
-          property_id: string
-          protocol: string
-          status?: string
-          subject: string
-          tenant_id: string
-        }
-        Update: {
-          category?: string
           created_at?: string
           id?: string
+          joined_at?: string
+          profile_id: string
+          revoked_at?: string | null
+          role: Database["public"]["Enums"]["tenant_role"]
+          status?: Database["public"]["Enums"]["tenant_membership_status"]
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          joined_at?: string
           profile_id?: string
-          property_id?: string
-          protocol?: string
-          status?: string
-          subject?: string
+          revoked_at?: string | null
+          role?: Database["public"]["Enums"]["tenant_role"]
+          status?: Database["public"]["Enums"]["tenant_membership_status"]
           tenant_id?: string
+          updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "support_requests_profile_id_fkey"
+            foreignKeyName: "tenant_members_profile_id_fkey"
             columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "support_requests_property_id_fkey"
-            columns: ["property_id"]
-            isOneToOne: false
-            referencedRelation: "properties"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "support_requests_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      tenant_members: {
-        Row: {
-          created_at: string
-          id: string
-          role: string
-          status: string
-          tenant_id: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id: string
-          role: string
-          status?: string
-          tenant_id: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          role?: string
-          status?: string
-          tenant_id?: string
-          user_id?: string
-        }
-        Relationships: [
           {
             foreignKeyName: "tenant_members_tenant_id_fkey"
             columns: ["tenant_id"]
@@ -656,18 +602,39 @@ export type Database = {
       tenants: {
         Row: {
           created_at: string
+          display_name: string
           id: string
-          name: string
+          legal_name: string
+          locale: string
+          metadata: Json
+          slug: string
+          status: Database["public"]["Enums"]["tenant_status"]
+          timezone: string
+          updated_at: string
         }
         Insert: {
           created_at?: string
-          id: string
-          name: string
+          display_name: string
+          id?: string
+          legal_name: string
+          locale?: string
+          metadata?: Json
+          slug: string
+          status?: Database["public"]["Enums"]["tenant_status"]
+          timezone?: string
+          updated_at?: string
         }
         Update: {
           created_at?: string
+          display_name?: string
           id?: string
-          name?: string
+          legal_name?: string
+          locale?: string
+          metadata?: Json
+          slug?: string
+          status?: Database["public"]["Enums"]["tenant_status"]
+          timezone?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -676,14 +643,6 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      apply_profile_correction: {
-        Args: {
-          audit_reason: string
-          replacement_document: string
-          target_profile_id: string
-        }
-        Returns: string
-      }
       can_access_residence: {
         Args: { target_property_id: string }
         Returns: boolean
@@ -692,37 +651,13 @@ export type Database = {
         Args: { target_profile_id: string; target_tenant_id?: string }
         Returns: boolean
       }
-      create_support_message: {
-        Args: {
-          requested_property_id?: string
-          requested_resident_profile_id?: string
-          requested_tenant_id?: string
-          target_content: string
-          target_created_at?: string
-          target_sender_profile_id?: string
-          target_sender_type?: string
-          target_support_request_id: string
-        }
-        Returns: {
-          content: string
-          created_at: string
-          delivery_sequence: number
-          id: string
-          property_id: string
-          resident_access_revoked: boolean
-          resident_profile_id: string
-          resident_user_id: string
-          sender_profile_id: string | null
-          sender_type: string
-          support_request_id: string
-          tenant_id: string
-        }
-        SetofOptions: {
-          from: "*"
-          to: "support_messages"
-          isOneToOne: true
-          isSetofReturn: false
-        }
+      check_association_details_enabled_modules: {
+        Args: { m: Json }
+        Returns: boolean
+      }
+      check_association_details_settings: {
+        Args: { s: Json }
+        Returns: boolean
       }
       current_profile_id: { Args: never; Returns: string }
       current_tenant_context: { Args: never; Returns: Json }
@@ -748,28 +683,11 @@ export type Database = {
         Args: { target_property_id: string }
         Returns: boolean
       }
-      is_active_resident_support_participant: {
-        Args: {
-          target_profile_id: string
-          target_property_id: string
-          target_tenant_id: string
-        }
-        Returns: boolean
-      }
       is_active_tenant_member: {
         Args: { target_tenant_id: string }
         Returns: boolean
       }
-      is_authorized_operator: {
-        Args: { target_tenant_id: string }
-        Returns: boolean
-      }
       is_platform_admin: { Args: never; Returns: boolean }
-      is_support_request_author: {
-        Args: { target_request_id: string }
-        Returns: boolean
-      }
-      is_tenant_member: { Args: { target_tenant_id: string }; Returns: boolean }
       log_audit_event: {
         Args: {
           target_action: string
@@ -807,12 +725,25 @@ export type Database = {
         | "profile_contacts:read_association"
         | "profile_contacts:verify"
         | "tenant_context:admin"
+        | "residents:read"
+        | "residents:write"
+        | "residence_payers:read"
+        | "residence_payers:write"
+        | "household:read"
+        | "household:write"
+        | "invitations:read"
+        | "invitations:write"
+        | "association_details:read"
+        | "association_details:write"
+        | "audit:read_association"
+        | "residences:read_routes"
       tenant_role:
         | "association_admin"
         | "association_operator"
         | "association_finance"
         | "association_support"
         | "association_viewer"
+        | "association_collector"
       tenant_status: "active" | "inactive" | "under_review"
       verification_state:
         | "unverified"
@@ -974,6 +905,18 @@ export const Constants = {
         "profile_contacts:read_association",
         "profile_contacts:verify",
         "tenant_context:admin",
+        "residents:read",
+        "residents:write",
+        "residence_payers:read",
+        "residence_payers:write",
+        "household:read",
+        "household:write",
+        "invitations:read",
+        "invitations:write",
+        "association_details:read",
+        "association_details:write",
+        "audit:read_association",
+        "residences:read_routes",
       ],
       tenant_role: [
         "association_admin",
@@ -981,6 +924,7 @@ export const Constants = {
         "association_finance",
         "association_support",
         "association_viewer",
+        "association_collector",
       ],
       tenant_status: ["active", "inactive", "under_review"],
       verification_state: [
