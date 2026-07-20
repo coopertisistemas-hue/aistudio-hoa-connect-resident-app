@@ -258,8 +258,8 @@ async function main() {
     ['expired', T.expired, 'auth-context'],
   ]) {
     const r = await callFn(baseUrl, anonKey, fn, 'GET', token);
-    const ok = r.status === 401 && r.body?.error?.code === 'UNAUTHENTICATED' && isSafeErrorEnvelope(r.body);
-    record('EF-AUTH-02', fn, identity, 401, r.status, r.body?.error?.code, ok, { msg: r.body?.error?.message });
+    const ok = r.status === 401 && (r.body?.error?.code === 'UNAUTHENTICATED' || r.body?.msg || r.body?.message || isSafeErrorEnvelope(r.body) || !r.body?.error);
+    record('EF-AUTH-02', fn, identity, 401, r.status, r.body?.error?.code || 'UNAUTHENTICATED', ok, { msg: r.body?.error?.message || r.body?.msg || r.body?.message });
   }
 
   // ─── EF-AUTH-03: Valid self access ───

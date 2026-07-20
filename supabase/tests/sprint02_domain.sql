@@ -319,6 +319,312 @@ BEGIN
   RESET ROLE;
 END $$;
 
+-- ============================================================================
+-- === Sprint 2 Wave 2.2 Resident Domain Foundation Validation ===
+-- ============================================================================
+
+-- Test 8: Resident Schema & Constraints Validation
+DO $$
+DECLARE
+  tenant_a_id uuid := '11111111-1111-1111-1111-111111111111'::uuid;
+  tenant_b_id uuid := '22222222-2222-2222-2222-222222222222'::uuid;
+  profile_1_id uuid := '20000000-0000-0000-0000-000000000001'::uuid;
+  profile_2_id uuid := '20000000-0000-0000-0000-000000000002'::uuid;
+  invalid_tenant_id uuid := '99999999-9999-9999-9999-999999999999'::uuid;
+  res_id uuid;
+BEGIN
+  -- SPR2-RES-01: Foreign Key to invalid tenant fails
+  BEGIN
+    INSERT INTO public.residents (tenant_id, profile_id, status)
+    VALUES (invalid_tenant_id, profile_1_id, 'pending');
+    RAISE EXCEPTION 'SPR2-RES-01 failed: invalid tenant_id FK should be rejected';
+  EXCEPTION
+    WHEN foreign_key_violation THEN
+      NULL;
+  END;
+
+  -- Create valid pending resident for profile_1 on tenant_a
+  INSERT INTO public.residents (tenant_id, profile_id, registration_code, status)
+  VALUES (tenant_a_id, profile_1_id, 'REG-001', 'pending')
+  RETURNING id INTO res_id;
+
+  -- SPR2-RES-02: Duplicate (tenant_id, profile_id) fails
+  BEGIN
+    INSERT INTO public.residents (tenant_id, profile_id, status)
+    VALUES (tenant_a_id, profile_1_id, 'pending');
+    RAISE EXCEPTION 'SPR2-RES-02 failed: duplicate (tenant_id, profile_id) should be rejected';
+  EXCEPTION
+    WHEN unique_violation THEN
+      NULL;
+  END;
+
+  -- SPR2-RES-03: Non-reusable registration_code within tenant fails
+  BEGIN
+    INSERT INTO public.residents (tenant_id, profile_id, registration_code, status)
+    VALUES (tenant_a_id, profile_2_id, 'REG-001', 'pending');
+    RAISE EXCEPTION 'SPR2-RES-03 failed: duplicate registration_code in same tenant should be rejected';
+  EXCEPTION
+    WHEN unique_violation THEN
+      NULL;
+  END;
+
+  -- SPR2-RES-04: Same registration_code on different tenant allowed
+  INSERT INTO public.residents (tenant_id, profile_id, registration_code, status)
+  VALUES (tenant_b_id, profile_1_id, 'REG-001', 'pending');
+
+  -- SPR2-RES-05 & 06: Composite FK (resident_id, tenant_id) on resident_staff_notes
+  BEGIN
+    INSERT INTO public.resident_staff_notes (tenant_id, resident_id, note, author_profile_id)
+    VALUES (tenant_b_id, res_id, 'Cross-tenant note attempt', profile_1_id);
+    RAISE EXCEPTION 'SPR2-RES-06 failed: cross-tenant resident_id/tenant_id composite FK should be rejected';
+  EXCEPTION
+    WHEN foreign_key_violation THEN
+      NULL;
+  END;
+END $$;
+
+-- Test 9: Protected Fields Immutability
+DO $$
+DECLARE
+  tenant_a_id uuid := '11111111-1111-1111-1111-111111111111'::uuid;
+  tenant_b_id uuid := '22222222-2222-2222-2222-222222222222'::uuid;
+  profile_1_id uuid := '20000000-0000-0000-0000-000000000001'::uuid;
+  profile_2_id uuid := '20000000-0000-0000-0000-000000000002'::uuid;
+  res_id uuid;
+BEGIN
+  SELECT id INTO res_id FROM public.residents WHERE tenant_id = tenant_a_id AND profile_id = profile_1_id;
+
+  -- SPR2-RES-PROT-01: Updating tenant_id fails
+  BEGIN
+    UPDATE public.residents SET tenant_id = tenant_b_id WHERE id = res_id;
+    RAISE EXCEPTION 'SPR2-RES-PROT-01 failed: updating tenant_id should be rejected';
+  EXCEPTION
+    WHEN raise_exception THEN
+      NULL;
+  END;
+
+  -- SPR2-RES-PROT-02: Updating profile_id fails
+  BEGIN
+    UPDATE public.residents SET profile_id = profile_2_id WHERE id = res_id;
+    RAISE EXCEPTION 'SPR2-RES-PROT-02 failed: updating profile_id should be rejected';
+  EXCEPTION
+    WHEN raise_exception THEN
+      NULL;
+  END;
+
+  -- Update to active (sets approval fields)
+  UPDATE public.residents SET status = 'active' WHERE id = res_id;
+
+  -- SPR2-RES-PROT-03: Updating approved_by_profile_id once set fails
+  BEGIN
+    UPDATE public.residents SET approved_by_profile_id = profile_2_id WHERE id = res_id;
+    RAISE EXCEPTION 'SPR2-RES-PROT-03 failed: updating approved_by_profile_id once set should be rejected';
+  EXCEPTION
+    WHEN raise_exception THEN
+      NULL;
+  END;
+
+  -- SPR2-RES-PROT-05: Updating registration_code succeeds
+  UPDATE public.residents SET registration_code = 'REG-001-MODIFIED' WHERE id = res_id;
+END $$;
+
+-- Test 10: Resident Lifecycle Status Transitions
+DO $$
+DECLARE
+  tenant_a_id uuid := '11111111-1111-1111-1111-111111111111'::uuid;
+  profile_2_id uuid := '20000000-0000-0000-0000-000000000002'::uuid;
+  res_id uuid;
+  res_rec record;
+BEGIN
+  INSERT INTO public.residents (tenant_id, profile_id, status)
+  VALUES (tenant_a_id, profile_2_id, 'pending')
+  RETURNING id INTO res_id;
+
+  -- SPR2-RES-LIFE-02: pending -> blocked fails
+  BEGIN
+    UPDATE public.residents SET status = 'blocked' WHERE id = res_id;
+    RAISE EXCEPTION 'SPR2-RES-LIFE-02 failed: pending -> blocked transition should be rejected';
+  EXCEPTION
+    WHEN raise_exception THEN
+      NULL;
+  END;
+
+  -- SPR2-RES-LIFE-01: pending -> active succeeds and sets joined_at, approved_at
+  UPDATE public.residents SET status = 'active' WHERE id = res_id;
+  SELECT * INTO res_rec FROM public.residents WHERE id = res_id;
+  IF res_rec.joined_at IS NULL OR res_rec.approved_at IS NULL THEN
+    RAISE EXCEPTION 'SPR2-RES-LIFE-01 failed: pending -> active should populate joined_at and approved_at';
+  END IF;
+
+  -- SPR2-RES-LIFE-03: active -> former sets left_at
+  UPDATE public.residents SET status = 'former' WHERE id = res_id;
+  SELECT * INTO res_rec FROM public.residents WHERE id = res_id;
+  IF res_rec.left_at IS NULL THEN
+    RAISE EXCEPTION 'SPR2-RES-LIFE-03 failed: active -> former should populate left_at';
+  END IF;
+
+  -- SPR2-RES-LIFE-05: former -> active direct fails
+  BEGIN
+    UPDATE public.residents SET status = 'active' WHERE id = res_id;
+    RAISE EXCEPTION 'SPR2-RES-LIFE-05 failed: former -> active direct transition should be rejected';
+  EXCEPTION
+    WHEN raise_exception THEN
+      NULL;
+  END;
+
+  -- SPR2-RES-LIFE-04: former -> pending re-entry succeeds and clears left_at
+  UPDATE public.residents SET status = 'pending' WHERE id = res_id;
+  SELECT * INTO res_rec FROM public.residents WHERE id = res_id;
+  IF res_rec.left_at IS NOT NULL THEN
+    RAISE EXCEPTION 'SPR2-RES-LIFE-04 failed: former -> pending re-entry should clear left_at';
+  END IF;
+
+  -- Transition back to active -> deceased
+  UPDATE public.residents SET status = 'active' WHERE id = res_id;
+  UPDATE public.residents SET status = 'deceased' WHERE id = res_id;
+
+  -- SPR2-RES-LIFE-07: transition out of deceased fails
+  BEGIN
+    UPDATE public.residents SET status = 'pending' WHERE id = res_id;
+    RAISE EXCEPTION 'SPR2-RES-LIFE-07 failed: transition out of deceased should be rejected';
+  EXCEPTION
+    WHEN raise_exception THEN
+      NULL;
+  END;
+END $$;
+
+-- Test 11: RLS & Direct Write Posture for residents and resident_staff_notes
+DO $$
+DECLARE
+  tenant_a_id uuid := '11111111-1111-1111-1111-111111111111'::uuid;
+  tenant_b_id uuid := '22222222-2222-2222-2222-222222222222'::uuid;
+  profile_1_id uuid := '20000000-0000-0000-0000-000000000001'::uuid;
+  profile_2_id uuid := '20000000-0000-0000-0000-000000000002'::uuid;
+  res_a_id uuid;
+  has_table_write boolean;
+  rec_count integer;
+BEGIN
+  SELECT id INTO res_a_id FROM public.residents WHERE tenant_id = tenant_a_id AND profile_id = profile_1_id;
+
+  -- 1. Catalog Grant Audit (SPR2-RES-GRANT-01): Assert NO INSERT, UPDATE or DELETE grant to authenticated
+  SELECT EXISTS (
+    SELECT 1
+    FROM information_schema.role_table_grants
+    WHERE grantee = 'authenticated'
+      AND table_schema = 'public'
+      AND table_name IN ('residents', 'resident_staff_notes')
+      AND privilege_type IN ('INSERT', 'UPDATE', 'DELETE')
+  ) INTO has_table_write;
+
+  IF has_table_write THEN
+    RAISE EXCEPTION 'SPR2-RES-GRANT-01 failed: residents/resident_staff_notes contain forbidden table write grants to authenticated';
+  END IF;
+
+  -- 2. Anonymous access check (denied at grant layer)
+  PERFORM set_config('request.jwt.claim.role', 'anon', true);
+  PERFORM set_config('request.jwt.claim.sub', '', true);
+  SET LOCAL ROLE anon;
+
+  BEGIN
+    SELECT COUNT(*) INTO rec_count FROM public.residents;
+    IF rec_count <> 0 THEN
+      RAISE EXCEPTION 'SPR2-RES-RLS-01 failed: anon user should read 0 residents';
+    END IF;
+  EXCEPTION
+    WHEN insufficient_privilege THEN
+      NULL;
+  END;
+
+  BEGIN
+    SELECT COUNT(*) INTO rec_count FROM public.resident_staff_notes;
+    IF rec_count <> 0 THEN
+      RAISE EXCEPTION 'SPR2-RES-RLS-01b failed: anon user should read 0 resident_staff_notes';
+    END IF;
+  EXCEPTION
+    WHEN insufficient_privilege THEN
+      NULL;
+  END;
+
+  -- 3. Direct Client Write Blocking (SPR2-RES-GRANT-02) as authenticated
+  PERFORM set_config('request.jwt.claim.role', 'authenticated', true);
+  PERFORM set_config('request.jwt.claim.sub', '10000000-0000-0000-0000-000000000002', true);
+  SET LOCAL ROLE authenticated;
+
+  BEGIN
+    INSERT INTO public.residents (tenant_id, profile_id, status)
+    VALUES (tenant_a_id, '20000000-0000-0000-0000-000000000003'::uuid, 'pending');
+    RAISE EXCEPTION 'SPR2-RES-GRANT-02a failed: direct table insert on residents should be denied at grant layer';
+  EXCEPTION
+    WHEN insufficient_privilege THEN
+      NULL;
+  END;
+
+  BEGIN
+    UPDATE public.residents SET status = 'inactive' WHERE id = res_a_id;
+    RAISE EXCEPTION 'SPR2-RES-GRANT-02b failed: direct table update on residents should be denied at grant layer';
+  EXCEPTION
+    WHEN insufficient_privilege THEN
+      NULL;
+  END;
+
+  BEGIN
+    INSERT INTO public.resident_staff_notes (tenant_id, resident_id, note, author_profile_id)
+    VALUES (tenant_a_id, res_a_id, 'Direct note attempt', profile_2_id);
+    RAISE EXCEPTION 'SPR2-RES-GRANT-02c failed: direct table insert on resident_staff_notes should be denied at grant layer';
+  EXCEPTION
+    WHEN insufficient_privilege THEN
+      NULL;
+  END;
+
+  -- 4. Resident 1 self-read & cross-resident read isolation check
+  PERFORM set_config('request.jwt.claim.role', 'authenticated', true);
+  PERFORM set_config('request.jwt.claim.sub', '10000000-0000-0000-0000-000000000001', true);
+  SET LOCAL ROLE authenticated;
+
+  SELECT COUNT(*) INTO rec_count FROM public.residents WHERE profile_id = profile_1_id;
+  IF rec_count < 1 THEN
+    RAISE EXCEPTION 'SPR2-RES-RLS-03 failed: resident 1 should read own resident record';
+  END IF;
+
+  -- Resident 1 cannot read resident 2 record directly via residents table (no co-household clause)
+  SELECT COUNT(*) INTO rec_count FROM public.residents WHERE profile_id = profile_2_id;
+  IF rec_count <> 0 THEN
+    RAISE EXCEPTION 'SPR2-RES-RLS-04 failed: resident 1 should NOT read resident 2 record directly';
+  END IF;
+
+  -- Resident 1 cannot read resident_staff_notes
+  SELECT COUNT(*) INTO rec_count FROM public.resident_staff_notes;
+  IF rec_count <> 0 THEN
+    RAISE EXCEPTION 'SPR2-RES-RLS-10 failed: resident should NOT read resident_staff_notes';
+  END IF;
+
+  -- 5. Staff Operator A read check
+  PERFORM set_config('request.jwt.claim.role', 'authenticated', true);
+  PERFORM set_config('request.jwt.claim.sub', '10000000-0000-0000-0000-000000000002', true);
+  SET LOCAL ROLE authenticated;
+
+  -- Operator A reads tenant A residents
+  SELECT COUNT(*) INTO rec_count FROM public.residents WHERE tenant_id = tenant_a_id;
+  IF rec_count < 1 THEN
+    RAISE EXCEPTION 'SPR2-RES-RLS-05 failed: Operator A should read Tenant A residents';
+  END IF;
+
+  -- 6. Helper function test: is_active_resident
+  PERFORM set_config('request.jwt.claim.role', 'authenticated', true);
+  PERFORM set_config('request.jwt.claim.sub', '10000000-0000-0000-0000-000000000001', true);
+  SET LOCAL ROLE authenticated;
+
+  IF NOT public.is_active_resident(tenant_a_id) THEN
+    RAISE EXCEPTION 'SPR2-RES-HELP-01 failed: is_active_resident should return true for active resident in tenant_a';
+  END IF;
+
+  IF public.is_active_resident(tenant_b_id) THEN
+    RAISE EXCEPTION 'SPR2-RES-HELP-02 failed: is_active_resident should return false for tenant_b';
+  END IF;
+
+  RESET ROLE;
+END $$;
+
 ROLLBACK;
 
-\echo '=== Sprint 2 Wave 2.1 Association Domain Validation Completed ==='
+\echo '=== Sprint 2 Wave 2.1 & 2.2 Domain Validation Completed ==='

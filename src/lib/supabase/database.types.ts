@@ -548,6 +548,122 @@ export type Database = {
           },
         ]
       }
+      resident_staff_notes: {
+        Row: {
+          author_profile_id: string
+          created_at: string
+          id: string
+          note: string
+          note_kind: string
+          resident_id: string
+          tenant_id: string
+        }
+        Insert: {
+          author_profile_id: string
+          created_at?: string
+          id?: string
+          note: string
+          note_kind?: string
+          resident_id: string
+          tenant_id: string
+        }
+        Update: {
+          author_profile_id?: string
+          created_at?: string
+          id?: string
+          note?: string
+          note_kind?: string
+          resident_id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "resident_staff_notes_author_profile_id_fkey"
+            columns: ["author_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "resident_staff_notes_resident_fk"
+            columns: ["resident_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "residents"
+            referencedColumns: ["id", "tenant_id"]
+          },
+          {
+            foreignKeyName: "resident_staff_notes_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      residents: {
+        Row: {
+          approved_at: string | null
+          approved_by_profile_id: string | null
+          created_at: string
+          id: string
+          joined_at: string | null
+          left_at: string | null
+          profile_id: string
+          registration_code: string | null
+          status: Database["public"]["Enums"]["resident_status"]
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by_profile_id?: string | null
+          created_at?: string
+          id?: string
+          joined_at?: string | null
+          left_at?: string | null
+          profile_id: string
+          registration_code?: string | null
+          status?: Database["public"]["Enums"]["resident_status"]
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by_profile_id?: string | null
+          created_at?: string
+          id?: string
+          joined_at?: string | null
+          left_at?: string | null
+          profile_id?: string
+          registration_code?: string | null
+          status?: Database["public"]["Enums"]["resident_status"]
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "residents_approved_by_profile_id_fkey"
+            columns: ["approved_by_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "residents_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "residents_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tenant_members: {
         Row: {
           created_at: string
@@ -683,6 +799,10 @@ export type Database = {
         Args: { target_property_id: string }
         Returns: boolean
       }
+      is_active_resident: {
+        Args: { target_tenant_id: string }
+        Returns: boolean
+      }
       is_active_tenant_member: {
         Args: { target_tenant_id: string }
         Returns: boolean
@@ -700,6 +820,8 @@ export type Database = {
         }
         Returns: string
       }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
     }
     Enums: {
       contact_type: "email" | "phone" | "whatsapp"
@@ -714,6 +836,13 @@ export type Database = {
         | "resident"
         | "dependent"
         | "authorized_contact"
+      resident_status:
+        | "pending"
+        | "active"
+        | "inactive"
+        | "former"
+        | "deceased"
+        | "blocked"
       tenant_membership_status: "active" | "pending" | "revoked"
       tenant_permission:
         | "tenant_members:read"
@@ -893,6 +1022,14 @@ export const Constants = {
         "resident",
         "dependent",
         "authorized_contact",
+      ],
+      resident_status: [
+        "pending",
+        "active",
+        "inactive",
+        "former",
+        "deceased",
+        "blocked",
       ],
       tenant_membership_status: ["active", "pending", "revoked"],
       tenant_permission: [
