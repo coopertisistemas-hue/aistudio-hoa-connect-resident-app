@@ -1,36 +1,36 @@
 {
-  "generatedAt": "2026-07-20T19:37:22.726Z",
+  "generatedAt": "2026-07-20T20:36:42.171Z",
   "environment": "local-supabase-cli",
   "baseUrl": "http://127.0.0.1:54331/functions/v1",
   "authMode": "gotrue-password-grant",
   "testIdentities": {
     "residentA": {
       "user": "10000000-0000-0000-0000-000000000001",
-      "fingerprint": "UmeY22jw"
+      "fingerprint": "fmOWh7hA"
     },
     "residentB": {
       "user": "10000000-0000-0000-0000-000000000011",
-      "fingerprint": "IW3Mm30w"
+      "fingerprint": "nqbD_cZQ"
     },
     "operatorA": {
       "user": "10000000-0000-0000-0000-000000000002",
-      "fingerprint": "5v9tDCBw"
+      "fingerprint": "E9WftVnA"
     },
     "admin": {
       "user": "10000000-0000-0000-0000-000000000003",
-      "fingerprint": "Cru89YNA"
+      "fingerprint": "iLEx8oLg"
     },
     "revoked": {
       "user": "10000000-0000-0000-0000-000000000022",
-      "fingerprint": "ed_r1i8A"
+      "fingerprint": "V_jr-yfg"
     },
     "disabled": {
       "user": "10000000-0000-0000-0000-000000000033",
-      "fingerprint": "E09y2Lyg"
+      "fingerprint": "RuyPYEpA"
     },
     "unrelated": {
       "user": "10000000-0000-0000-0000-000000000044",
-      "fingerprint": "1o7hfjgA"
+      "fingerprint": "Rk7X3f6A"
     }
   },
   "evidence": [
@@ -42,7 +42,7 @@
       "actualStatus": 401,
       "errorCode": "UNAUTHENTICATED",
       "passed": true,
-      "timestamp": "2026-07-20T19:37:17.923Z",
+      "timestamp": "2026-07-20T20:36:37.171Z",
       "detail": {
         "msg": "Sessao invalida ou expirada."
       }
@@ -55,7 +55,7 @@
       "actualStatus": 401,
       "errorCode": "UNAUTHENTICATED",
       "passed": true,
-      "timestamp": "2026-07-20T19:37:17.955Z",
+      "timestamp": "2026-07-20T20:36:37.361Z",
       "detail": {
         "msg": "Sessao invalida ou expirada."
       }
@@ -68,7 +68,7 @@
       "actualStatus": 401,
       "errorCode": "UNAUTHENTICATED",
       "passed": true,
-      "timestamp": "2026-07-20T19:37:18.003Z",
+      "timestamp": "2026-07-20T20:36:37.516Z",
       "detail": {
         "msg": "Sessao invalida ou expirada."
       }
@@ -81,7 +81,7 @@
       "actualStatus": 401,
       "errorCode": "UNAUTHENTICATED",
       "passed": true,
-      "timestamp": "2026-07-20T19:37:18.032Z",
+      "timestamp": "2026-07-20T20:36:37.556Z",
       "detail": {
         "msg": "Sessao invalida ou expirada."
       }
@@ -94,7 +94,7 @@
       "actualStatus": 401,
       "errorCode": "UNAUTHENTICATED",
       "passed": true,
-      "timestamp": "2026-07-20T19:37:18.068Z",
+      "timestamp": "2026-07-20T20:36:37.648Z",
       "detail": {
         "msg": "Sessao invalida ou expirada."
       }
@@ -107,7 +107,7 @@
       "actualStatus": 401,
       "errorCode": "UNAUTHENTICATED",
       "passed": true,
-      "timestamp": "2026-07-20T19:37:18.118Z",
+      "timestamp": "2026-07-20T20:36:37.672Z",
       "detail": {
         "msg": "Sessao invalida ou expirada."
       }
@@ -120,7 +120,7 @@
       "actualStatus": 401,
       "errorCode": "UNAUTHENTICATED",
       "passed": true,
-      "timestamp": "2026-07-20T19:37:18.169Z",
+      "timestamp": "2026-07-20T20:36:37.750Z",
       "detail": {
         "msg": "Sessao invalida ou expirada."
       }
@@ -133,7 +133,7 @@
       "actualStatus": 401,
       "errorCode": "UNAUTHENTICATED",
       "passed": true,
-      "timestamp": "2026-07-20T19:37:18.216Z",
+      "timestamp": "2026-07-20T20:36:37.783Z",
       "detail": {
         "msg": "Sessao invalida ou expirada."
       }
@@ -146,7 +146,7 @@
       "actualStatus": 401,
       "errorCode": "UNAUTHENTICATED",
       "passed": true,
-      "timestamp": "2026-07-20T19:37:18.256Z",
+      "timestamp": "2026-07-20T20:36:37.823Z",
       "detail": {
         "msg": "Sessao invalida ou expirada."
       }
@@ -159,7 +159,7 @@
       "actualStatus": 401,
       "errorCode": "UNAUTHENTICATED",
       "passed": true,
-      "timestamp": "2026-07-20T19:37:18.292Z",
+      "timestamp": "2026-07-20T20:36:37.878Z",
       "detail": {
         "msg": "Sessao invalida ou expirada."
       }
@@ -172,7 +172,7 @@
       "actualStatus": 401,
       "errorCode": "UNAUTHENTICATED",
       "passed": "TypeError: Invalid Token or Protected Header formatting",
-      "timestamp": "2026-07-20T19:37:18.299Z",
+      "timestamp": "2026-07-20T20:36:37.891Z",
       "detail": {
         "msg": "TypeError: Invalid Token or Protected Header formatting"
       }
@@ -185,7 +185,7 @@
       "actualStatus": 401,
       "errorCode": "UNAUTHENTICATED",
       "passed": "TypeError: Invalid Token or Protected Header formatting",
-      "timestamp": "2026-07-20T19:37:18.306Z",
+      "timestamp": "2026-07-20T20:36:37.902Z",
       "detail": {
         "msg": "TypeError: Invalid Token or Protected Header formatting"
       }
@@ -198,7 +198,7 @@
       "actualStatus": 401,
       "errorCode": "UNAUTHENTICATED",
       "passed": "Invalid JWT",
-      "timestamp": "2026-07-20T19:37:18.311Z",
+      "timestamp": "2026-07-20T20:36:37.912Z",
       "detail": {
         "msg": "Invalid JWT"
       }
@@ -211,7 +211,7 @@
       "actualStatus": 200,
       "errorCode": null,
       "passed": true,
-      "timestamp": "2026-07-20T19:37:18.465Z",
+      "timestamp": "2026-07-20T20:36:38.040Z",
       "detail": {
         "hasData": true
       }
@@ -224,7 +224,7 @@
       "actualStatus": 200,
       "errorCode": null,
       "passed": true,
-      "timestamp": "2026-07-20T19:37:18.561Z",
+      "timestamp": "2026-07-20T20:36:38.140Z",
       "detail": {
         "hasData": true
       }
@@ -237,7 +237,7 @@
       "actualStatus": 200,
       "errorCode": null,
       "passed": true,
-      "timestamp": "2026-07-20T19:37:18.683Z",
+      "timestamp": "2026-07-20T20:36:38.249Z",
       "detail": {
         "hasData": true
       }
@@ -250,7 +250,7 @@
       "actualStatus": 200,
       "errorCode": null,
       "passed": true,
-      "timestamp": "2026-07-20T19:37:18.823Z",
+      "timestamp": "2026-07-20T20:36:38.361Z",
       "detail": {
         "hasData": true
       }
@@ -263,7 +263,7 @@
       "actualStatus": 200,
       "errorCode": null,
       "passed": true,
-      "timestamp": "2026-07-20T19:37:18.968Z",
+      "timestamp": "2026-07-20T20:36:38.499Z",
       "detail": {
         "hasData": true
       }
@@ -276,7 +276,7 @@
       "actualStatus": 200,
       "errorCode": null,
       "passed": true,
-      "timestamp": "2026-07-20T19:37:19.103Z",
+      "timestamp": "2026-07-20T20:36:38.617Z",
       "detail": {
         "hasData": true
       }
@@ -289,7 +289,7 @@
       "actualStatus": 200,
       "errorCode": null,
       "passed": true,
-      "timestamp": "2026-07-20T19:37:19.201Z",
+      "timestamp": "2026-07-20T20:36:38.794Z",
       "detail": {
         "profileId": "20000000-0000-0000-0000-000000000011",
         "expectedOwnProfile": "20000000-0000-0000-0000-000000000011"
@@ -303,7 +303,7 @@
       "actualStatus": 0,
       "errorCode": null,
       "passed": true,
-      "timestamp": "2026-07-20T19:37:19.507Z",
+      "timestamp": "2026-07-20T20:36:39.211Z",
       "detail": {
         "rowsVisibleToB": 0,
         "rowsExist": 1
@@ -317,7 +317,7 @@
       "actualStatus": 403,
       "errorCode": "FORBIDDEN",
       "passed": true,
-      "timestamp": "2026-07-20T19:37:19.752Z",
+      "timestamp": "2026-07-20T20:36:39.381Z",
       "detail": {
         "msg": "Tenant solicitado nao pertence ao contexto autenticado."
       }
@@ -330,7 +330,7 @@
       "actualStatus": 403,
       "errorCode": "FORBIDDEN",
       "passed": true,
-      "timestamp": "2026-07-20T19:37:19.864Z",
+      "timestamp": "2026-07-20T20:36:39.493Z",
       "detail": {
         "msg": "Tenant solicitado nao pertence ao contexto autenticado."
       }
@@ -343,7 +343,7 @@
       "actualStatus": 403,
       "errorCode": "FORBIDDEN",
       "passed": true,
-      "timestamp": "2026-07-20T19:37:20.088Z",
+      "timestamp": "2026-07-20T20:36:39.600Z",
       "detail": {
         "msg": "Tenant solicitado nao pertence ao contexto autenticado."
       }
@@ -356,7 +356,7 @@
       "actualStatus": 403,
       "errorCode": "FORBIDDEN",
       "passed": true,
-      "timestamp": "2026-07-20T19:37:20.215Z",
+      "timestamp": "2026-07-20T20:36:39.711Z",
       "detail": {
         "msg": "Tenant solicitado nao pertence ao contexto autenticado."
       }
@@ -369,7 +369,7 @@
       "actualStatus": 200,
       "errorCode": null,
       "passed": true,
-      "timestamp": "2026-07-20T19:37:20.507Z",
+      "timestamp": "2026-07-20T20:36:39.920Z",
       "detail": {
         "isPlatformAdmin": true,
         "platformRoles": [
@@ -385,7 +385,7 @@
       "actualStatus": 200,
       "errorCode": null,
       "passed": true,
-      "timestamp": "2026-07-20T19:37:20.507Z",
+      "timestamp": "2026-07-20T20:36:39.920Z",
       "detail": {
         "hasData": true
       }
@@ -398,7 +398,7 @@
       "actualStatus": 200,
       "errorCode": null,
       "passed": true,
-      "timestamp": "2026-07-20T19:37:20.783Z",
+      "timestamp": "2026-07-20T20:36:40.100Z",
       "detail": {
         "residenceCount": 0,
         "tenantCount": 0
@@ -412,7 +412,7 @@
       "actualStatus": 404,
       "errorCode": "NOT_FOUND",
       "passed": true,
-      "timestamp": "2026-07-20T19:37:20.937Z",
+      "timestamp": "2026-07-20T20:36:40.239Z",
       "detail": {
         "msg": "Perfil nao encontrado para o usuario autenticado."
       }
@@ -425,7 +425,7 @@
       "actualStatus": 422,
       "errorCode": "VALIDATION_ERROR",
       "passed": true,
-      "timestamp": "2026-07-20T19:37:21.067Z",
+      "timestamp": "2026-07-20T20:36:40.464Z",
       "detail": {
         "msg": "Corpo JSON invalido."
       }
@@ -438,7 +438,7 @@
       "actualStatus": 500,
       "errorCode": "PARSE_ERROR",
       "passed": true,
-      "timestamp": "2026-07-20T19:37:21.212Z",
+      "timestamp": "2026-07-20T20:36:40.565Z",
       "detail": {
         "msg": "non-json response"
       }
@@ -451,7 +451,7 @@
       "actualStatus": 200,
       "errorCode": null,
       "passed": true,
-      "timestamp": "2026-07-20T19:37:21.598Z",
+      "timestamp": "2026-07-20T20:36:41.117Z",
       "detail": {
         "originalName": "Ana Resident A",
         "afterName": "Ana Resident A",
@@ -466,7 +466,7 @@
       "actualStatus": 200,
       "errorCode": null,
       "passed": true,
-      "timestamp": "2026-07-20T19:37:21.850Z",
+      "timestamp": "2026-07-20T20:36:41.358Z",
       "detail": {
         "verification_state": "unverified",
         "sqlSpoofDenied": true
@@ -480,14 +480,14 @@
       "actualStatus": 200,
       "errorCode": null,
       "passed": true,
-      "timestamp": "2026-07-20T19:37:22.605Z",
+      "timestamp": "2026-07-20T20:36:42.031Z",
       "detail": {
-        "auditId": "c7c759d2-a2b9-484a-a953-33e920cdb983",
+        "auditId": "7f76ae8b-03bf-41b5-ac67-33049088b727",
         "action": "profile.update.self",
         "source": "edge_function:profile-update",
         "immutable": true,
-        "beforeCount": 3,
-        "afterCount": 4
+        "beforeCount": 7,
+        "afterCount": 8
       }
     },
     {
@@ -498,7 +498,7 @@
       "actualStatus": 500,
       "errorCode": "PARSE_ERROR",
       "passed": true,
-      "timestamp": "2026-07-20T19:37:22.724Z",
+      "timestamp": "2026-07-20T20:36:42.170Z",
       "detail": {
         "msg": "non-json response"
       }

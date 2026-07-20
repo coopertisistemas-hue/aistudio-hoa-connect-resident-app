@@ -2,7 +2,7 @@
 
 **Wave:** 2.3
 **Topic:** Residence & Household Domain Foundation
-**Status:** CERTIFIED — APPROVED FOR PUBLICATION
+**Status:** CONDITIONS REMEDIATED — PENDING FINAL INDEPENDENT CLOSEOUT
 **Date:** 2026-07-20
 
 ---
@@ -347,16 +347,112 @@ Concurrency: `pg_advisory_xact_lock` on `(property_id, profile_id)` hash prevent
 
 ---
 
-## 12. Final Recommendation
+## 12. Operational Remediation Summary
 
-Wave 2.3 has been remediated and independently recertified by Codex:
+Wave 2.3 publication conditions have been operationalized and verified with verifiable empirical evidence:
 
-1. The household visibility defect is corrected with the `is_household_responsible` helper and 10 negative authorization gates.
-2. The cross-table duplication invariant is structurally enforced with a trigger function, advisory-lock concurrency control, and 10 validation gates covering both mutation directions.
-3. This report accurately reflects the implementation state with all claims supported by test evidence.
+1. The household visibility defect is corrected with the `is_household_responsible(id)` SECURITY DEFINER helper and 10 negative authorization gates.
+2. The cross-table duplication invariant is structurally enforced with the `prevent_platform_user_household_duplicate()` trigger function, advisory-lock concurrency control, and 10 validation gates covering both mutation directions.
+3. All publication conditions (production Supabase audit, data preservation evidence, Vercel production deployment verification, Edge Function smoke tests, and commit `b24ced9` scope classification) have been completed.
 
-**Recertification result:** Codex returned `PASS WITH CONDITIONS` on 2026-07-20. No CRITICAL or HIGH findings remain open. Residual findings (R-01 through R-04) are documented in §10 — only R-01 carries a mandatory Wave 2.4b design gate.
+---
+
+## 13. Final Publication Conditions Closure
+
+### 13.1 Privileged Production Supabase Verification
+
+Direct privileged inspection of live production project `xcuxcqbctfjgccsdqwgl` was conducted via linked CLI (`supabase migration list --linked` and `supabase db dump --linked`):
+
+- **Applied Migration History:** Verified 5 matching migrations between local repository and remote database:
+  - `20260719170000_sprint01_foundation_identity.sql`
+  - `20260720090000_sprint02_wave21_enums.sql`
+  - `20260720100000_sprint02_wave21_association_domain.sql`
+  - `20260720110000_sprint02_wave22_resident_domain.sql`
+  - `20260720120000_sprint02_wave23_residence_household.sql`
+- **Function Definitions Verified:**
+  - `resident.current_profile_id()`: STABLE SECURITY DEFINER with `SET search_path = ''`.
+  - `resident.has_tenant_permission()`: STABLE SECURITY DEFINER with `SET search_path = ''`.
+  - `resident.is_active_residence_member()`: STABLE SECURITY DEFINER with `SET search_path = ''`.
+  - `resident.is_household_responsible(uuid)`: STABLE SECURITY DEFINER with `SET search_path = ''`.
+  - `resident.prevent_platform_user_household_duplicate()`: PLPGSQL trigger function with `SET search_path = ''` using advisory locking.
+- **Trigger Attachments Verified:**
+  - `trg_household_members_no_platform_dup` attached `BEFORE INSERT OR UPDATE` on `resident.household_members`.
+  - `trg_residence_members_no_household_dup` attached `BEFORE INSERT OR UPDATE` on `resident.residence_members`.
+  - Bidirectional enforcement active.
+- **RLS & Grants Posture:**
+  - RLS enabled on all 16 tables in `resident` schema.
+  - `GRANT USAGE ON SCHEMA resident TO authenticated;` active (no usage grant to `anon`).
+  - Core domain tables (`residents`, `residence_members`, `household_members`, `tenants`, `tenant_members`, `properties`, `association_details`, `association_settings_private`, `resident_staff_notes`) have ONLY `SELECT` grants for `authenticated`. No direct `INSERT`, `UPDATE`, or `DELETE` grants exist.
+  - PostgREST exposure in `supabase/config.toml`: `api.schemas = ["public", "graphql_public", "resident"]`.
+
+### 13.2 Data-Preservation Evidence
+
+- **Destructive SQL Analysis:** Automated inspection of all migration SQL files for `DROP TABLE`, `DROP SCHEMA`, `TRUNCATE`, `DELETE FROM`, `CASCADE`, `CREATE OR REPLACE TABLE` returned ZERO destructive table/schema deletion statements (`ON DELETE CASCADE` is present only as declarative FK ON DELETE actions).
+- **Catalog & Row Count Co-existence:** Catalog dump confirms preserved `public` tables co-exist alongside newly created `resident` schema namespace.
+- **Defensible Conclusion:** No evidence of production data loss was found.
+- **Historical Limitation:** Pre-migration baseline table snapshot counts were not recorded prior to initial deployment; co-existence and lack of destructive DDL statements form the basis of this conclusion.
+
+### 13.3 Vercel Production Verification
+
+Direct inspection via Vercel CLI (`vercel inspect`) and HTTP probing:
+
+- **Project:** `aistudio-hoa-connect-resident-app` (under team `cooperti-sistemas-projects`)
+- **Deployment ID:** `dpl_AHCmoMqbeDUWhFwNfrGXTMghnJEr`
+- **Deployment URL:** `https://aistudio-hoa-connect-resident-jomux7osx.vercel.app`
+- **Production Alias:** `https://hoaconnect-res.vercel.app`
+- **Deployment Status:** `● Ready`
+- **Associated Git Commit:** `b24ced93279f11d9debbc23cac929789d1d8b319` on branch `sprint-01-foundation-identity`
+- **HTTP Smoke Checks:**
+  - Root route `/` -> HTTP 200 OK
+  - Manifest `/manifest.json` -> HTTP 200 OK
+  - Favicon `/icons/icon-192.svg` -> HTTP 200 OK
+  - SPA bundle assets -> HTTP 200 OK
+
+### 13.4 Edge Function Verification
+
+All 10 expected resident Edge Functions verified deployed and active on project `xcuxcqbctfjgccsdqwgl`:
+
+1. `auth-bootstrap` (HTTP 401 unauthenticated)
+2. `auth-context` (HTTP 401 unauthenticated)
+3. `profile-contact-delete` (HTTP 401 unauthenticated)
+4. `profile-contact-upsert` (HTTP 401 unauthenticated)
+5. `profile-contacts-list` (HTTP 401 unauthenticated)
+6. `profile-get` (HTTP 401 unauthenticated)
+7. `profile-update` (HTTP 401 unauthenticated)
+8. `resident-auth` (HTTP 401 unauthenticated)
+9. `tenant-context-list` (HTTP 401 unauthenticated)
+10. `tenant-context-select` (HTTP 401 unauthenticated)
+
+No unexpected 404, 500, CORS, or schema errors observed. Automated suite `npm run supabase:test:edge-func-auth` passed 35/35 test cases (EXIT 0).
+
+### 13.5 Commit `b24ced9` Scope Classification
+
+File-by-file audit of commit `b24ced93279f11d9debbc23cac929789d1d8b319`:
+
+1. `.gitignore` — `ANCILLARY BUT JUSTIFIED` (Prevents local environment files `.env*` from being committed during migration runs).
+2. `src/lib/supabase/database.types.ts` — `REQUIRED` (Exposes `resident` schema types for frontend type checking).
+3. `supabase/config.toml` — `REQUIRED` (Adds `resident` to `api.schemas`).
+4. `supabase/functions/_shared/auth.ts` — `REQUIRED` (Targets `resident` schema in Edge Function auth helper).
+5. `supabase/migrations/20260719170000_sprint01_foundation_identity.sql` — `REQUIRED` (Establishes `resident` schema namespace).
+6. `supabase/migrations/20260720090000_sprint02_wave21_enums.sql` — `REQUIRED` (Isolates enums in `resident` schema).
+7. `supabase/migrations/20260720100000_sprint02_wave21_association_domain.sql` — `REQUIRED` (Isolates association domain tables/policies in `resident` schema).
+8. `supabase/migrations/20260720110000_sprint02_wave22_resident_domain.sql` — `REQUIRED` (Isolates resident domain tables/policies in `resident` schema).
+9. `supabase/migrations/20260720120000_sprint02_wave23_residence_household.sql` — `REQUIRED` (Isolates residence & household domain tables/triggers/policies in `resident` schema).
+10. `supabase/seed.sql` — `ANCILLARY BUT JUSTIFIED` (Populates `resident` schema in seed).
+11. `supabase/tests/sprint01_edge_function_auth.test.mjs` — `ANCILLARY BUT JUSTIFIED` (Updates Edge Function auth test assertions for `resident` schema).
+12. `supabase/tests/sprint01_edge_function_fixtures.sql` — `ANCILLARY BUT JUSTIFIED` (Updates Edge Function test fixture SQL for `resident` schema).
+13. `supabase/tests/sprint01_foundation.sql` — `ANCILLARY BUT JUSTIFIED` (Updates foundation pgTAP tests for `resident` schema).
+14. `supabase/tests/sprint02_domain.sql` — `ANCILLARY BUT JUSTIFIED` (Updates domain pgTAP tests for `resident` schema).
+15. `validation/sprint01_edge_function_authorization.json` — `ANCILLARY BUT JUSTIFIED` (Updates Edge Function authorization evidence).
+
+Zero unrelated files or Wave 2.4 functionality were introduced.
+
+### 13.6 Residual Findings
+
+Only informational / future-wave design findings remain open (R-01 through R-04 as detailed in §10). Specifically, R-01 (trigger `SECURITY INVOKER` posture) is documented as a mandatory design gate for Wave 2.4b before resident-initiated write RPCs are introduced.
+
+### 13.7 Final Closeout Candidate Status
 
 ```text
-WAVE 2.3 CERTIFIED — APPROVED FOR PUBLICATION
+WAVE 2.3 CONDITIONS REMEDIATED — PENDING FINAL INDEPENDENT CLOSEOUT
 ```
