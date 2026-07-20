@@ -20,19 +20,87 @@ required by Sprint 2, per `28-sprint-02-domain-model.md` and
 - **Audit:** every mutation emits exactly one `audit_events` row via
   `log_audit_event(tenant_id, action, entity_type, entity_id, source, request_id,
   metadata)` with `source = 'edge_function:<name>'`.
-- **Service role:** forbidden for authorization. Sole exception: the invitation-accept
-  RPC path (§3), implemented as SECURITY DEFINER `accept_residence_invitation()` with
-  internal checks — never as blanket service-role table access (R-09).
-- **Idempotency:** natural uniqueness enforced by DB constraints (partial unique
-  indexes from doc 28); retries of the same logical operation return 200 with the
-  existing entity (`CONFLICT` only for genuinely conflicting state). Mutations that
-  create rows accept an optional `client_request_id` echoed into audit metadata;
-  duplicate `client_request_id` within 24 h for the same actor+action returns the
-  original result (implemented via audit lookup — final mechanism reviewed in Wave 2.5;
-  if the lookup cost is unjustified, constraint-based idempotency alone is shipped and
-  the deviation is recorded).
+- **Service role:** forbidden entirely. **(R1)** Sprint 2 uses it in zero flows; the
+  invitation-accept path is a `SECURITY DEFINER` RPC (owner-executed function with
+  explicit internal checks), not a service-role client (R-09).
+- **(R1) Idempotency — constraint-based only.** `client_request_id` is **removed** from
+  the contract. It was specified as "duplicate within 24 h returns the original result,
+  implemented via audit lookup", which was unimplementable on three counts: `audit_events`
+  has no unique index on `(actor, client_request_id)` so duplicates race; `authenticated`
+  holds no read grant on `audit_events` (`…foundation_identity.sql:742-749`); and an
+  audit row records that something happened, not the response body, so "the original
+  result" could not be reconstructed. Every create in this package has a natural key, so
+  DB constraints are sufficient. Shipping a field that does not do what it says is worse
+  than not shipping it.
+- **(R1) Idempotent replay requires payload equivalence.** A retry returns `200` with the
+  existing entity **only if** the incoming payload matches the existing row on the
+  natural key *and* the material fields. Otherwise `409 CONFLICT`. The previous rule
+  ("unique key replay ⇒ 200 existing") would silently return the wrong unit when an
+  operator registered a *different* property reusing a `unit_identifier`, and then attach
+  residents to it. Collision usually means operator error, not retry.
 - **Pagination:** `limit` (default 50, max 200) + `cursor` (created_at,id). All list
   endpoints.
+- **(R1) Contract version:** every response carries `meta.contractVersion = "2.0"`
+  (document 27 D-16). Paths remain unversioned, matching the certified Sprint 1
+  functions.
+
+## 1.1 Mutation architecture (R1 — RC-01/RC-02, document 27 D-12)
+
+**Every mutation in Sprint 2 executes inside exactly one `SECURITY INVOKER` plpgsql RPC.
+Edge Functions never write through PostgREST.**
+
+The previous revision specified Edge Functions orchestrating independent PostgREST
+writes while promising transactional semantics — "one transaction" cascades in F-07 and
+F-17, a full accept sequence in F-20, and a document 31 gate asserting "failure
+mid-cascade ⇒ total rollback, zero partial rows". Each PostgREST call is its own
+transaction, so an Edge Function issuing five calls performs five transactions and a
+failure on the fourth leaves three committed. The gate would have failed on first
+execution, and a partially-applied cascade on a deceased resident is precisely the data
+corruption the historical-integrity principle exists to prevent.
+
+This affects **every** mutation, not only cascades: doc §1 requires each one to emit an
+audit event, so `INSERT` + `log_audit_event()` is already two statements.
+
+```
+Client
+  │  HTTPS + user JWT
+  ▼
+Edge Function          transport · JWT validation · input validation · envelope ·
+  │                    error mapping · rate limiting · pagination · response shaping
+  │  exactly one RPC call per write request
+  ▼
+RPC (SECURITY INVOKER) one transaction · all writes · invariant checks RLS cannot
+  │                    express (periods, cross-table state) · log_audit_event()
+  ▼
+RLS                    authorization, evaluated as the calling user inside the RPC
+  ▼
+Transaction            atomic commit of mutation + relationships + history + audit
+  ▼
+Audit                  append-only audit_events row, same transaction, always
+```
+
+| Layer | Owns | Must never |
+|---|---|---|
+| Edge Function | HTTP, JWT, input schema, envelope, error codes, rate limiting, pagination cursors, response projection *of data the caller may already read* | perform a write; enforce confidentiality; hold authorization state |
+| RPC (`INVOKER`) | the whole transaction: writes, cross-table invariants, audit call | be `DEFINER` (that would move authorization out of RLS); swallow authorization errors |
+| RLS | who may read/write which row | be bypassed by service role or elevated function |
+| Transaction | all-or-nothing | span two RPC calls |
+| Audit | immutable record | be written outside the mutating transaction |
+
+**Rules.** One write RPC per request. An operation needing two writes needs one RPC, not
+two calls. RPCs are `VOLATILE`, `SET search_path = ''`, no dynamic SQL except through
+`format(%I/%L)`, and must not catch exceptions in a way that converts an authorization
+failure into a success (R-21). Read endpoints may query PostgREST directly where a single
+policy-scoped select suffices; they use a read RPC where a projection must be enforced
+rather than merely applied (document 29 §8).
+
+**RPC inventory** — one per mutating endpoint: `association_details_update`,
+`resident_create`, `resident_update`, `resident_status_transition`, `residence_create`,
+`residence_update`, `residence_member_assign`, `residence_member_approve`,
+`residence_member_end`, `residence_moveout_request`, `household_member_upsert`,
+`household_member_end`, `household_member_promote`, `residence_payer_assign`,
+`residence_payer_end`, `invitation_create`, `invitation_revoke`, plus the two sanctioned
+`DEFINER` RPCs `accept_residence_invitation` and `tenant_audit_events`.
 
 ## 2. Function inventory
 
@@ -79,10 +147,14 @@ present for tenant-owned entities.
 - **Actor:** any active tenant member, active resident of the tenant, platform admin.
 - **Request:** `?tenant_id=` (must be in caller context).
 - **Response `data`:** `{ tenant: {id, legal_name, display_name, slug, status},
-  details: {trade_name, registration_number, email, phone, address_*, settings:
-  public_projection, enabled_modules} }` — `settings` filtered to a public allow-list
-  (`requires_resident_approval`, `allows_resident_invitations`,
-  `allows_self_moveout_request`); internal keys withheld.
+  details: {trade_name, registration_number, email, phone, address_*, settings,
+  enabled_modules} }`.
+- **(R1) `settings` is returned in full, and that is safe**, because
+  `association_details.settings` now holds only the four allow-listed member-visible
+  keys (doc 28 §6.1). Internal configuration lives in `association_settings_private`,
+  which this endpoint does not read and which no member-scoped policy exposes. The
+  previous design promised an Edge Function "public projection" over a jsonb column that
+  every member could read in full via PostgREST — a projection, not a control (D-14).
 - **Authorization:** F-01 succeeds iff caller would pass the
   `association_details` SELECT policy.
 - **RLS:** plain `authClient` SELECT on `tenants` + `association_details`.
@@ -115,8 +187,16 @@ present for tenant-owned entities.
 - **Response `data`:** `{ items: [{ resident_id, registration_code, status,
   profile: {id, full_name, preferred_name}, properties: [{id, unit_identifier,
   block_identifier, role}], joined_at }], next_cursor }`.
-- **Authorization/RLS:** SELECT via policies; profile fields flow through the certified
-  `profiles_select_association_policy` chain.
+- **(R1) Authorization/RLS:** SELECT via policies; profile fields flow through the
+  **extended** `profiles_select_association_policy` (document 28 §12 item 3, document 29
+  §6.7). The certified predicate required an active `residence_members` row, so this
+  contract was unfulfillable for `pending`, `former`/`deceased` and off-site-payer
+  residents — their profiles were invisible and the list would have rendered records
+  with no name. The extension adds one alternative (a `residents` row in the tenant) and
+  grants no access to any actor who did not already hold `profiles:read_association`.
+- **(R1) `q` search** matches `registration_code` (trigram index, doc 28 §6.2) and
+  profile display fields through the same policy chain; PERF2-08 gates this path, which
+  previously had no gate.
 - **Errors:** 401, 403 (resident self attempting staff list), 404.
 - **Audit:** none. **Idempotency:** n/a.
 - **Tests:** each staff role 200; resident self 403; cross-tenant 0 rows; q-enumeration
@@ -168,8 +248,11 @@ present for tenant-owned entities.
   close_payers?: bool }`.
 - **Semantics:** validates against the §8.1 transition graph of doc 28
   (`pending→active` = approve; sets `approved_by/approved_at`; `deceased`/`former`
-  require `close_memberships`/`close_payers` explicit flags — orchestrates F-14/F-18
-  closures in one transaction, each audited).
+  require `close_memberships`/`close_payers` explicit flags). **(R1)** The cascade runs
+  inside `resident_status_transition()` as a single transaction — not as orchestrated
+  F-14/F-18 calls, which would have been independent transactions leaving a
+  half-closed resident on any mid-cascade failure. Each closure is still audited
+  individually, in the same transaction.
 - **Response:** `{ resident_id, status, closed: {memberships: n, payers: n} }`.
 - **Errors:** 401, 403, 404, 409 (illegal transition, e.g. `deceased→active`), 422.
 - **Audit:** `resident.approve` or `resident.status_change` (+ child closure events).
@@ -182,11 +265,21 @@ present for tenant-owned entities.
 - **Actor:** staff `residences:read` (incl. collector), finance, viewer.
 - **Request:** `?tenant_id=&status=&occupancy=occupied|vacant&block=&limit=&cursor=`.
 - **Response:** properties + derived occupancy (active member count, payer presence) —
-  computed from certified partial active indexes; no stored occupancy column.
-- **Collector scoping:** collector role receives `{id, unit_identifier,
-  block_identifier, address_*, occupancy_state}` only — no resident identity fields
-  (column projection in EF, since collector lacks `residents:read` the join yields
-  nothing — assert in test).
+  no stored occupancy column. **(R1)** Computed using the **new** partial indexes
+  `idx_residence_members_property_open` / `_profile_open` (document 28 §5.4). The
+  certified `idx_residence_members_*` indexes are plain composite, not partial
+  (`…foundation_identity.sql:214-215`); the earlier wording here was incorrect.
+- **(R1) Collector scoping is structural, not projected.** The collector holds
+  `residences:read_routes` and **not** `residences:read`, so every query it can issue —
+  through this endpoint or directly via PostgREST — returns `{id, unit_identifier,
+  block_identifier, address_*, occupancy_state}` and nothing else. The previous design
+  granted the collector the existing `residences:read` and relied on an EF column
+  projection plus a test asserting "the join yields nothing because collector lacks
+  `residents:read`". That test would have passed while the collector read every
+  `residence_members` row in the tenant directly: certified policy
+  `residence_members_select_tenant_policy` (`…foundation_identity.sql:686`) is keyed on
+  `residences:read`. The gate now reads `residence_members` **as the collector** and
+  asserts zero rows (document 31 SPR2-RLS-12).
 - **Errors:** 401, 403, 404. **Audit:** none.
 - **Tests:** roles matrix; collector projection has zero PII keys; vacant filter
   correct against fixtures.
@@ -197,7 +290,16 @@ present for tenant-owned entities.
 - **Response (staff):** property + active+historical memberships + household_members +
   payer history + pending invitations count.
 - **Response (household):** property + active memberships (profile display names) +
-  household_members + **active** payer name only (no payer history).
+  household_members + **active** payer name only.
+- **(R1) The "no payer history" promise is now enforced by RLS**, not by this
+  projection: the `residence_payers` SELECT policy carries a `status = 'active'`
+  conjunct for household members (document 29 §6.4), so ended rows are unreachable even
+  by direct PostgREST access. Previously household members were granted the whole table
+  for the property while the contract promised the active row only.
+- **(R1) Housemate visibility lives here.** The co-household clause was removed from the
+  `residents` SELECT policy (document 29 §6.2); this endpoint is the sanctioned,
+  property-scoped way for a resident to see who they live with, and it returns display
+  names only — never resident lifecycle status, staff notes or status reasons.
 - **Authorization:** `can_access_residence(property_id)` for household; permission for
   staff.
 - **Errors:** 401, 403 (member of another property), 404 (cross-tenant).
@@ -211,14 +313,22 @@ present for tenant-owned entities.
   district?, city, state, postal_code?, unit_identifier, block_identifier?,
   metadata? }`.
 - **Response:** created property.
-- **RLS:** `authenticated` has **no INSERT grant on `properties`** in Sprint 1 —
-  Wave 2.4 must add grant + INSERT policy WITH CHECK
-  `has_tenant_permission(tenant_id,'residences:write')` (schema change recorded in doc
-  28 §12 amendment; additive).
+- **(R1) RLS:** the previously planned INSERT **grant** on `properties` is
+  **withdrawn**. `authenticated` gains no write grant on any table (document 29 §2 rule
+  12); the write executes inside `residence_create()` (`SECURITY INVOKER`), where the
+  INSERT policy `WITH CHECK has_tenant_permission(tenant_id,'residences:write')` is
+  evaluated as the caller. Certified guarantee #3 is therefore preserved. `properties`
+  still appears in the frozen list (document 28 §12 item 2) for its
+  `UNIQUE (id, tenant_id)` composite-FK parent constraint.
 - **Errors:** 401, 403, 409 (`UNIQUE(tenant_id, unit_identifier)`), 422.
-- **Audit:** `residence.create`. **Idempotency:** unique key replay ⇒ 200 existing.
-- **Tests:** happy; duplicate unit 200-idempotent; operator 200; viewer 403; forged
-  tenant 403.
+- **Audit:** `residence.create`.
+- **(R1) Idempotency:** replay returns 200 with the existing property **only if** the
+  payload matches it on the material fields; a `unit_identifier` collision carrying
+  different address/label data ⇒ `409 UNIT_IDENTIFIER_CONFLICT`. Returning 200 for a
+  genuinely different unit would attach residents to the wrong property.
+- **Tests:** happy; identical replay 200; **conflicting** duplicate unit 409; operator
+  200; viewer 403; forged tenant 403; direct PostgREST INSERT by any actor ⇒ permission
+  denied.
 
 ### F-11 `residence-update` (PATCH `?property_id=`)
 
@@ -243,8 +353,14 @@ present for tenant-owned entities.
   (RESIDENT_REQUIRED, bad role).
 - **Audit:** `residence_member.assign`.
 - **Idempotency:** partial unique replay ⇒ 200 existing.
-- **Tests:** duplicate active 200-idempotent; second *primary* for profile auto-demotes
-  or 409 (decision in Wave 2.5 — recommend 409, explicit); cross-tenant profile 404.
+- **(R1) Primary conflict — decision closed:** a second active primary for the same
+  profile **in the same tenant** ⇒ `409 PRIMARY_CONFLICT`. No silent auto-demotion:
+  demoting a residence the operator did not name is a surprising side effect on a
+  legally meaningful flag. Demotion is an explicit `residence-member-update` call.
+  The constraint is tenant-scoped (document 28 §6.9), so a person may hold one primary
+  residence per association.
+- **Tests:** identical replay 200-idempotent; second primary ⇒ 409; cross-tenant
+  profile 404; direct PostgREST INSERT ⇒ permission denied.
 
 ### F-13 `residence-member-approve` (POST)
 
@@ -287,12 +403,15 @@ present for tenant-owned entities.
 ### F-16 `household-member-remove` (DELETE `?id=`)
 
 - **Actor:** responsible resident; staff (`household:write`).
-- **Semantics:** hard delete allowed (D-10) with audit capturing the removed payload
-  snapshot in metadata.
+- **(R1) Semantics — no hard delete.** The row transitions to `status='former'` with
+  `end_date` and an audit snapshot. Hard deletion was removed (document 28 §6.3): its
+  only justification was pre-approval cleanup, and Sprint 2 has no household approval
+  flow, so it contradicted the historical-integrity principle applied everywhere else.
+  The endpoint keeps its name and DELETE verb; the effect is a terminal transition.
 - **Errors:** 401, 403, 404.
 - **Audit:** `household_member.remove` (snapshot).
-- **Idempotency:** second delete ⇒ 404 (acceptable) or 200 no-op — decide Wave 2.5
-  (recommend 200 no-op for client simplicity).
+- **(R1) Idempotency — decision closed:** a second call on an already-`former` row ⇒
+  **200 no-op** (client simplicity; the desired end state holds).
 - **Tests:** self remove 200; non-responsible member 403; audit snapshot present.
 
 ### F-17 `residence-payer-assign` (POST)
@@ -301,10 +420,17 @@ present for tenant-owned entities.
 - **Request:** `{ property_id, profile_id, start_date?, force_close_existing?:
   bool }`.
 - **Semantics:** if an active payer exists and `force_close_existing` is false ⇒ 409;
-  with true, closes existing (`end_reason='replaced'`) and inserts new — one
-  transaction, two audit events.
-- **Guard:** payer profile is `residents` row of tenant, status in (active, inactive)
-  (doc 28 §6.4 invariant).
+  with true, closes existing (`end_reason='replaced'` — now an enum value, document 28
+  §7) and inserts the new row. **(R1)** Both writes happen inside
+  `residence_payer_assign()`, one transaction, two audit events. The new row must not
+  overlap any historical period (EXCLUDE constraint, document 28 §6.4) ⇒ 409 on
+  overlap.
+- **(R1) Guard is structural:** `residence_payers.resident_id` carries a composite FK
+  to `residents (id, tenant_id)`, so a payer who is not a resident of that tenant cannot
+  be written at all. The previous design referenced `profiles` and enforced this in the
+  Edge Function, with a trigger deferred to Wave 2.3 and a fallback of "EF-only with a
+  periodic integrity test" — a periodic test detects violations, it does not prevent
+  them. Status must still be in (`active`,`inactive`), checked in the RPC.
 - **Errors:** 401, 403, 404, 409 (active payer exists), 422 (payer not resident).
 - **Audit:** `residence_payer.assign` (+ `residence_payer.end` when replacing).
 - **Idempotency:** same (property, profile, active) replay ⇒ 200.
@@ -325,37 +451,77 @@ present for tenant-owned entities.
   inviter (active member of property, `inviter_type='resident'`, only when
   `settings.allows_resident_invitations`).
 - **Request:** `{ property_id, invitee_contact: {type: 'email'|'phone'|'whatsapp',
-  value}, proposed_role: <residence_role>, expires_in_hours?: <=720 }`.
+  value}, proposed_role: <residence_role>, expires_in_hours?: <=720, reissue?: bool }`.
 - **Response:** `{ invitation_id, expires_at, invite_token }` — **plaintext token
-  returned once**, only `token_hash` persisted.
-- **Errors:** 401, 403, 404, 409 (pending invitation exists for same contact+property),
-  422.
-- **Audit:** `invitation.create`.
-- **Idempotency:** partial unique replay ⇒ 200 with existing invitation (no new token).
-- **Tests:** duplicate pending 200-idempotent; resident inviter blocked when setting
-  off 403; token not stored plaintext (SQL gate asserts hash column only).
+  returned once**, only `token_hash` persisted (≥256-bit CSPRNG, SHA-256 at rest;
+  document 28 §6.5.1).
+- **(R1) Duplicate and reissue handling — the deadlock is removed.** Executed inside
+  `invitation_create()`, one transaction:
+  1. Sweep expired pending rows for this (property, contact) pair ⇒
+     `invitation.expire`; this releases the pending partial unique.
+  2. No live pending row ⇒ create, return a new token, `invitation.create`.
+  3. Live pending row and `reissue` absent/false ⇒ **`409 INVITATION_PENDING`**
+     carrying `invitation_id` and `expires_at` so the UI can offer reissue.
+  4. Live pending row and `reissue: true` (requires `invitations:write`) ⇒ revoke it
+     (`revoked_at`, `superseded_by` → new row), create a replacement with a **new
+     token**; two audit events in one transaction.
+  5. Contact already resolves to an active membership in the property ⇒
+     `409 ALREADY_MEMBER`, no row created.
+
+  The previous rule — "duplicate pending ⇒ 200 with existing invitation (no new
+  token)" — meant that once a token was lost, undelivered or expired, no working token
+  could ever be issued to that person for that unit again, and the `200` response
+  concealed it.
+- **Errors:** 401, 403, 404, 409 (`INVITATION_PENDING`, `ALREADY_MEMBER`), 422.
+- **Audit:** `invitation.create`, `invitation.expire`, `invitation.revoke` (reissue).
+- **Tests:** live duplicate ⇒ 409 with reissue affordance; `reissue:true` ⇒ new token
+  and `superseded_by` set; **expired** pending ⇒ swept then created with a new token;
+  resident inviter blocked when the setting is off ⇒ 403; token never stored plaintext
+  (SQL gate over column contents); token entropy ≥256 bits (generator gate).
 
 ### F-20 `invitation-accept` (POST)
 
 - **Actor:** authenticated user (any profile) presenting a valid token.
 - **Request:** `{ invite_token }`.
-- **Semantics:** SECURITY DEFINER `accept_residence_invitation(token)`:
-  hash → lookup → validate (status pending, not expired) → assert invitee contact
-  matches the caller's verified contact of that type (anti token-forwarding; if no
-  verified match ⇒ 403 `INVITEE_MISMATCH`) → create/attach `residents` (per
-  association `requires_resident_approval`: pending or active) → create
-  `residence_members` (proposed role; pending if approval required else active) → mark
-  accepted → audit.
-- **Errors:** 401; 403 (INVITEE_MISMATCH, disabled profile); 404 (unknown/expired/
-  already-used token — **single constant-shaped 404** for all invalid-token classes:
-  enumeration resistance R-17); 409 (already a member).
-- **Rate limiting:** `RATE_LIMITED` after N failures per caller/IP (mechanism in Wave
-  2.5 — platform rate-limit decision; at minimum per-caller attempt counting via audit
-  lookup).
-- **Audit:** `invitation.accept` (tenant_id from invitation).
-- **Idempotency:** replay of consumed token ⇒ 404 constant shape.
-- **Tests:** full accept happy path (bootstrap 404 user becomes resident); expired ⇒
-  404; wrong contact ⇒ 403; replay ⇒ 404; timing/shape equality across failure classes.
+- **(R1) Semantics — re-specified.** `SECURITY DEFINER accept_residence_invitation(token)`,
+  one transaction, full case table in document 28 §6.5.5:
+  hash → lookup → **record the attempt** (before any validation branch, so unknown
+  tokens are counted too) → throttle check → validate (`pending`, not expired) → bind
+  contact → resolve resident → create membership → consume → audit.
+- **(R1) Trust model — token-as-proof-of-contact.** The previous rule required the
+  caller to hold a **verified** contact matching the invitee. That was unsatisfiable:
+  Sprint 1 forces `verification_state='unverified'` on contact insert, and **no
+  contact-verification Edge Function exists** (`supabase/functions/` listing) — the only
+  verification path is the staff `profile_contacts:verify` permission, which staff
+  cannot exercise on someone who is not yet a resident. Every genuine new invitee would
+  have received `403 INVITEE_MISMATCH`; the flagship onboarding flow deadlocked on its
+  first execution.
+  **Replacement:** possession of a ≥256-bit single-use token delivered to the invited
+  contact *is* the verification event. On acceptance the matching contact is created or
+  transitioned to `verified`, attributed to the invitation. Contact already owned by a
+  **different** profile ⇒ `409 CONTACT_CONFLICT` (never reassigned).
+- **Errors:** 401; 403 (disabled profile); **404** — single constant-shaped body for
+  unknown / expired / revoked / already-accepted tokens (enumeration resistance, R-17);
+  409 (`ALREADY_MEMBER`, `CONTACT_CONFLICT`); 429 `RATE_LIMITED`.
+- **(R1) Rate limiting — real substrate.** `invitation_accept_attempts` (document 28
+  §6.6) plus the new `invitation.accept_failed` audit action. Threshold: >10 failures per
+  profile per hour or >20 per `token_hash_prefix` per hour ⇒ 429. The previous mechanism
+  ("per-caller attempt counting via audit lookup") did not exist: the audit catalog held
+  only successes, and `authenticated` cannot read `audit_events`.
+- **Audit:** `invitation.accept` (+ `resident.create`/`resident.status_change`,
+  `residence_member.assign`, `profile_contact.verify_by_invitation`) on success;
+  `invitation.accept_failed` on failure. `tenant_id` always derived from the invitation
+  row, never from the client.
+- **Idempotency:** replay of a consumed token ⇒ constant-shaped 404 (terminal-state
+  trigger enforces single use, not application logic).
+- **Tests:** accept happy path for a brand-new user with **no verified contact**
+  (the case that previously deadlocked), both `requires_resident_approval` settings;
+  contact created-and-verified and unverified-then-verified paths; contact owned by
+  another profile ⇒ 409; expired / revoked / unknown / replayed ⇒ **byte-equal** 404
+  bodies; no timing oracle distinguishing token existence (unique-index probe);
+  throttle ⇒ 429 after threshold; failed attempts recorded even for unknown tokens;
+  transaction atomicity — an injected failure after the resident insert leaves zero
+  rows and zero audit events.
 
 ### F-21 `invitation-revoke` (POST)
 
@@ -369,9 +535,13 @@ present for tenant-owned entities.
 
 - **Actor:** resident self with active membership.
 - **Request:** `{ membership_id, requested_end_date, reason? }`.
-- **Semantics:** sets membership into a staff-visible pending-closure state — modeled
-  as audit event + `residence_members` unchanged until staff runs F-14 (simplest
-  approvable flow; no new status value). Response confirms receipt.
+- **(R1) Semantics — queryable state, not an audit-only signal.** The RPC sets
+  `requested_end_date` and `moveout_requested_at` on the membership (additive columns,
+  document 28 §6.9) and emits the audit event. Staff list open requests with a normal
+  filtered query and clear them by running F-14. The previous design left
+  `residence_members` unchanged and expected staff to discover requests by reading the
+  audit stream: an append-only log is not a work queue — there was no way to list open
+  requests, mark one handled, or distinguish a second request from the first.
 - **Errors:** 401, 403 (not own membership), 404, 409 (already closed), 422 (past
   date).
 - **Audit:** `residence_member.moveout_request` (staff queue reads audit via F-24 or a
@@ -430,6 +600,36 @@ present for tenant-owned entities.
 `residence_payer.assign` · `residence_payer.end` · `invitation.create` ·
 `invitation.accept` · `invitation.revoke` · `invitation.expire`
 
+**(R1) Added actions (5):** `invitation.accept_failed` (brute-force substrate, F-20) ·
+`profile_contact.verify_by_invitation` (token-as-proof-of-contact, F-20) ·
+`household_member.promote` (household → platform user, document 28 §6.3) ·
+`resident_staff_note.create` (append-only staff notes, document 28 §6.8) ·
+`association_settings_private.update` (changed **keys** only, never values).
+
+Total: 25 actions.
+
 All use `log_audit_event()` (certified), `entity_type` = table name, `request_id` =
-envelope request id, metadata = changed-keys/snapshot as specified per function. Audit
-immutability is already certified; Sprint 2 adds per-action generation tests only.
+envelope request id, metadata = changed-keys/snapshot as specified per function.
+
+**(R1) Audit is emitted inside the mutating transaction**, by the RPC, never by the Edge
+Function after a separate write (§1.1). This converts "every mutation emits exactly one
+audit row" from a convention that a mid-flight failure could break into a structural
+property: gate SPR2-AUDIT-03 injects a failure and asserts zero domain rows **and** zero
+audit rows. Audit immutability is already certified; Sprint 2 adds per-action generation
+tests plus this atomicity gate.
+
+## 6. Verification record (R1 — CF-05 §14.1 of document 27)
+
+Runtime and baseline claims in this document were verified rather than assumed:
+each PostgREST call is its own transaction (runtime property; the reason §1.1 exists,
+asserted by gate SPR2-RPC-01 rather than cited); `authenticated` holds no read grant on
+`audit_events` and SELECT-only on the four structural tables
+(`…foundation_identity.sql:725-749`); `residence_members_select_tenant_policy` is keyed
+on `residences:read` (L686); `profiles_select_association_policy` requires an active
+membership (L591–604); `contact_type` = `email|phone|whatsapp` (L18);
+`verification_state` includes `unverified` (L21) and contact insert forces it (certified
+spoof guard); **no contact-verification Edge Function exists** — verified by listing
+`supabase/functions/`, which contains exactly `auth-bootstrap`, `auth-context`,
+`resident-auth`, `tenant-context-list`, `tenant-context-select`, `profile-get`,
+`profile-update`, `profile-contacts-list`, `profile-contact-upsert`,
+`profile-contact-delete` and `_shared/`.
