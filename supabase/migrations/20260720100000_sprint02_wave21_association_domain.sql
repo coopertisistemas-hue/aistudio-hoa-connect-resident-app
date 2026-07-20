@@ -2,7 +2,7 @@
 -- Implementation of tenant-scoped association_details, association_settings_private, RLS and constraints.
 
 -- 1. Update has_tenant_permission() function with extended matrix
-CREATE OR REPLACE FUNCTION public.has_tenant_permission(target_tenant_id uuid, target_permission public.tenant_permission)
+CREATE OR REPLACE FUNCTION resident.has_tenant_permission(target_tenant_id uuid, target_permission resident.tenant_permission)
 RETURNS boolean
 LANGUAGE sql
 STABLE
@@ -11,9 +11,9 @@ SET search_path = ''
 AS $$
   SELECT EXISTS (
     SELECT 1
-    FROM public.tenant_members AS tm
+    FROM resident.tenant_members AS tm
     WHERE tm.tenant_id = target_tenant_id
-      AND tm.profile_id = public.current_profile_id()
+      AND tm.profile_id = resident.current_profile_id()
       AND tm.status = 'active'
       AND (
         (target_permission = 'tenant_members:read' AND tm.role IN ('association_admin', 'association_operator', 'association_support', 'association_finance', 'association_viewer')) OR
@@ -42,7 +42,7 @@ AS $$
 $$;
 
 -- 2. Validation helper functions for JSONB constraints
-CREATE OR REPLACE FUNCTION public.check_association_details_settings(s jsonb)
+CREATE OR REPLACE FUNCTION resident.check_association_details_settings(s jsonb)
 RETURNS boolean
 LANGUAGE plpgsql
 IMMUTABLE
@@ -83,7 +83,7 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION public.check_association_details_enabled_modules(m jsonb)
+CREATE OR REPLACE FUNCTION resident.check_association_details_enabled_modules(m jsonb)
 RETURNS boolean
 LANGUAGE plpgsql
 IMMUTABLE
@@ -108,9 +108,9 @@ END;
 $$;
 
 -- 3. Table: association_details
-CREATE TABLE IF NOT EXISTS public.association_details (
+CREATE TABLE IF NOT EXISTS resident.association_details (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id uuid NOT NULL UNIQUE REFERENCES public.tenants(id) ON DELETE CASCADE,
+  tenant_id uuid NOT NULL UNIQUE REFERENCES resident.tenants(id) ON DELETE CASCADE,
   trade_name text,
   registration_number text,
   email text,
@@ -125,22 +125,22 @@ CREATE TABLE IF NOT EXISTS public.association_details (
   enabled_modules jsonb NOT NULL DEFAULT '[]'::jsonb,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT chk_association_details_settings CHECK (public.check_association_details_settings(settings)),
-  CONSTRAINT chk_association_details_enabled_modules CHECK (public.check_association_details_enabled_modules(enabled_modules))
+  CONSTRAINT chk_association_details_settings CHECK (resident.check_association_details_settings(settings)),
+  CONSTRAINT chk_association_details_enabled_modules CHECK (resident.check_association_details_enabled_modules(enabled_modules))
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_association_details_registration_number_unique
-  ON public.association_details(registration_number)
+  ON resident.association_details(registration_number)
   WHERE registration_number IS NOT NULL;
 
 -- Triggers for association_details
-DROP TRIGGER IF EXISTS touch_association_details_updated_at ON public.association_details;
+DROP TRIGGER IF EXISTS touch_association_details_updated_at ON resident.association_details;
 CREATE TRIGGER touch_association_details_updated_at
-  BEFORE UPDATE ON public.association_details
+  BEFORE UPDATE ON resident.association_details
   FOR EACH ROW
-  EXECUTE FUNCTION public.touch_updated_at();
+  EXECUTE FUNCTION resident.touch_updated_at();
 
-CREATE OR REPLACE FUNCTION public.association_details_protected_fields_immutable()
+CREATE OR REPLACE FUNCTION resident.association_details_protected_fields_immutable()
 RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -155,30 +155,30 @@ BEGIN
 END;
 $$;
 
-DROP TRIGGER IF EXISTS association_details_protected_fields_immutable ON public.association_details;
+DROP TRIGGER IF EXISTS association_details_protected_fields_immutable ON resident.association_details;
 CREATE TRIGGER association_details_protected_fields_immutable
-  BEFORE UPDATE ON public.association_details
+  BEFORE UPDATE ON resident.association_details
   FOR EACH ROW
-  EXECUTE FUNCTION public.association_details_protected_fields_immutable();
+  EXECUTE FUNCTION resident.association_details_protected_fields_immutable();
 
 -- 4. Table: association_settings_private
-CREATE TABLE IF NOT EXISTS public.association_settings_private (
+CREATE TABLE IF NOT EXISTS resident.association_settings_private (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id uuid NOT NULL UNIQUE REFERENCES public.tenants(id) ON DELETE CASCADE,
+  tenant_id uuid NOT NULL UNIQUE REFERENCES resident.tenants(id) ON DELETE CASCADE,
   settings jsonb NOT NULL DEFAULT '{}'::jsonb,
-  updated_by_profile_id uuid NULL REFERENCES public.profiles(id) ON DELETE RESTRICT,
+  updated_by_profile_id uuid NULL REFERENCES resident.profiles(id) ON DELETE RESTRICT,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
 -- Triggers for association_settings_private
-DROP TRIGGER IF EXISTS touch_association_settings_private_updated_at ON public.association_settings_private;
+DROP TRIGGER IF EXISTS touch_association_settings_private_updated_at ON resident.association_settings_private;
 CREATE TRIGGER touch_association_settings_private_updated_at
-  BEFORE UPDATE ON public.association_settings_private
+  BEFORE UPDATE ON resident.association_settings_private
   FOR EACH ROW
-  EXECUTE FUNCTION public.touch_updated_at();
+  EXECUTE FUNCTION resident.touch_updated_at();
 
-CREATE OR REPLACE FUNCTION public.association_settings_private_protected_fields_immutable()
+CREATE OR REPLACE FUNCTION resident.association_settings_private_protected_fields_immutable()
 RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -193,25 +193,25 @@ BEGIN
 END;
 $$;
 
-DROP TRIGGER IF EXISTS association_settings_private_protected_fields_immutable ON public.association_settings_private;
+DROP TRIGGER IF EXISTS association_settings_private_protected_fields_immutable ON resident.association_settings_private;
 CREATE TRIGGER association_settings_private_protected_fields_immutable
-  BEFORE UPDATE ON public.association_settings_private
+  BEFORE UPDATE ON resident.association_settings_private
   FOR EACH ROW
-  EXECUTE FUNCTION public.association_settings_private_protected_fields_immutable();
+  EXECUTE FUNCTION resident.association_settings_private_protected_fields_immutable();
 
 -- 5. Automatic Seeding Trigger on Tenants
-CREATE OR REPLACE FUNCTION public.handle_tenant_created()
+CREATE OR REPLACE FUNCTION resident.handle_tenant_created()
 RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
 AS $$
 BEGIN
-  INSERT INTO public.association_details (tenant_id, trade_name)
+  INSERT INTO resident.association_details (tenant_id, trade_name)
   VALUES (NEW.id, NEW.display_name)
   ON CONFLICT (tenant_id) DO NOTHING;
 
-  INSERT INTO public.association_settings_private (tenant_id)
+  INSERT INTO resident.association_settings_private (tenant_id)
   VALUES (NEW.id)
   ON CONFLICT (tenant_id) DO NOTHING;
 
@@ -219,101 +219,101 @@ BEGIN
 END;
 $$;
 
-DROP TRIGGER IF EXISTS on_tenant_created ON public.tenants;
+DROP TRIGGER IF EXISTS on_tenant_created ON resident.tenants;
 CREATE TRIGGER on_tenant_created
-  AFTER INSERT ON public.tenants
+  AFTER INSERT ON resident.tenants
   FOR EACH ROW
-  EXECUTE FUNCTION public.handle_tenant_created();
+  EXECUTE FUNCTION resident.handle_tenant_created();
 
 -- Backfill pre-existing tenants
-INSERT INTO public.association_details (tenant_id, trade_name)
-SELECT id, display_name FROM public.tenants
+INSERT INTO resident.association_details (tenant_id, trade_name)
+SELECT id, display_name FROM resident.tenants
 ON CONFLICT (tenant_id) DO NOTHING;
 
-INSERT INTO public.association_settings_private (tenant_id)
-SELECT id FROM public.tenants
+INSERT INTO resident.association_settings_private (tenant_id)
+SELECT id FROM resident.tenants
 ON CONFLICT (tenant_id) DO NOTHING;
 
 -- 6. Security & RLS Posture
-ALTER TABLE public.association_details ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.association_details FORCE ROW LEVEL SECURITY;
+ALTER TABLE resident.association_details ENABLE ROW LEVEL SECURITY;
+ALTER TABLE resident.association_details FORCE ROW LEVEL SECURITY;
 
-ALTER TABLE public.association_settings_private ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.association_settings_private FORCE ROW LEVEL SECURITY;
+ALTER TABLE resident.association_settings_private ENABLE ROW LEVEL SECURITY;
+ALTER TABLE resident.association_settings_private FORCE ROW LEVEL SECURITY;
 
-REVOKE ALL ON TABLE public.association_details FROM PUBLIC, anon, authenticated;
-GRANT SELECT ON TABLE public.association_details TO authenticated;
+REVOKE ALL ON TABLE resident.association_details FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON TABLE resident.association_details TO authenticated;
 
-REVOKE ALL ON TABLE public.association_settings_private FROM PUBLIC, anon, authenticated;
-GRANT SELECT ON TABLE public.association_settings_private TO authenticated;
+REVOKE ALL ON TABLE resident.association_settings_private FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON TABLE resident.association_settings_private TO authenticated;
 
 -- RLS Policies on association_details
-DROP POLICY IF EXISTS association_details_select_policy ON public.association_details;
+DROP POLICY IF EXISTS association_details_select_policy ON resident.association_details;
 CREATE POLICY association_details_select_policy
-  ON public.association_details
+  ON resident.association_details
   FOR SELECT
   TO authenticated
   USING (
-    public.has_tenant_permission(tenant_id, 'association_details:read')
-    OR public.is_platform_admin()
+    resident.has_tenant_permission(tenant_id, 'association_details:read')
+    OR resident.is_platform_admin()
     OR EXISTS (
-      SELECT 1 FROM public.properties p
-      JOIN public.residence_members rm ON rm.property_id = p.id
+      SELECT 1 FROM resident.properties p
+      JOIN resident.residence_members rm ON rm.property_id = p.id
       WHERE p.tenant_id = association_details.tenant_id
-        AND rm.profile_id = public.current_profile_id()
+        AND rm.profile_id = resident.current_profile_id()
         AND rm.status = 'active'
     )
   );
 
-DROP POLICY IF EXISTS association_details_update_policy ON public.association_details;
+DROP POLICY IF EXISTS association_details_update_policy ON resident.association_details;
 CREATE POLICY association_details_update_policy
-  ON public.association_details
+  ON resident.association_details
   FOR UPDATE
   TO authenticated
   USING (
-    public.has_tenant_permission(tenant_id, 'association_details:write')
+    resident.has_tenant_permission(tenant_id, 'association_details:write')
   )
   WITH CHECK (
-    public.has_tenant_permission(tenant_id, 'association_details:write')
+    resident.has_tenant_permission(tenant_id, 'association_details:write')
   );
 
-DROP POLICY IF EXISTS association_details_insert_policy ON public.association_details;
+DROP POLICY IF EXISTS association_details_insert_policy ON resident.association_details;
 CREATE POLICY association_details_insert_policy
-  ON public.association_details
+  ON resident.association_details
   FOR INSERT
   TO authenticated
   WITH CHECK (
-    public.has_tenant_permission(tenant_id, 'association_details:write')
+    resident.has_tenant_permission(tenant_id, 'association_details:write')
   );
 
 -- RLS Policies on association_settings_private
-DROP POLICY IF EXISTS association_settings_private_select_policy ON public.association_settings_private;
+DROP POLICY IF EXISTS association_settings_private_select_policy ON resident.association_settings_private;
 CREATE POLICY association_settings_private_select_policy
-  ON public.association_settings_private
+  ON resident.association_settings_private
   FOR SELECT
   TO authenticated
   USING (
-    public.has_tenant_permission(tenant_id, 'association_details:write')
-    OR public.is_platform_admin()
+    resident.has_tenant_permission(tenant_id, 'association_details:write')
+    OR resident.is_platform_admin()
   );
 
-DROP POLICY IF EXISTS association_settings_private_update_policy ON public.association_settings_private;
+DROP POLICY IF EXISTS association_settings_private_update_policy ON resident.association_settings_private;
 CREATE POLICY association_settings_private_update_policy
-  ON public.association_settings_private
+  ON resident.association_settings_private
   FOR UPDATE
   TO authenticated
   USING (
-    public.has_tenant_permission(tenant_id, 'association_details:write')
+    resident.has_tenant_permission(tenant_id, 'association_details:write')
   )
   WITH CHECK (
-    public.has_tenant_permission(tenant_id, 'association_details:write')
+    resident.has_tenant_permission(tenant_id, 'association_details:write')
   );
 
-DROP POLICY IF EXISTS association_settings_private_insert_policy ON public.association_settings_private;
+DROP POLICY IF EXISTS association_settings_private_insert_policy ON resident.association_settings_private;
 CREATE POLICY association_settings_private_insert_policy
-  ON public.association_settings_private
+  ON resident.association_settings_private
   FOR INSERT
   TO authenticated
   WITH CHECK (
-    public.has_tenant_permission(tenant_id, 'association_details:write')
+    resident.has_tenant_permission(tenant_id, 'association_details:write')
   );

@@ -16,7 +16,7 @@ CREATE EXTENSION IF NOT EXISTS btree_gist WITH SCHEMA public;
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'residence_membership_end_reason') THEN
-    CREATE TYPE public.residence_membership_end_reason AS ENUM (
+    CREATE TYPE resident.residence_membership_end_reason AS ENUM (
       'moved_out',
       'ownership_transferred',
       'tenancy_ended',
@@ -32,7 +32,7 @@ END $$;
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'household_relationship') THEN
-    CREATE TYPE public.household_relationship AS ENUM (
+    CREATE TYPE resident.household_relationship AS ENUM (
       'spouse',
       'child',
       'parent',
@@ -47,7 +47,7 @@ END $$;
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'household_member_status') THEN
-    CREATE TYPE public.household_member_status AS ENUM (
+    CREATE TYPE resident.household_member_status AS ENUM (
       'active',
       'inactive',
       'former'
@@ -58,45 +58,45 @@ END $$;
 -- ============================================================================
 -- 3. properties — Composite FK Parent (frozen item #2, D-13)
 -- ============================================================================
-ALTER TABLE public.properties ADD CONSTRAINT properties_id_tenant_key UNIQUE (id, tenant_id);
+ALTER TABLE resident.properties ADD CONSTRAINT properties_id_tenant_key UNIQUE (id, tenant_id);
 
 -- ============================================================================
 -- 4. residence_members — D-05 History Evolution (frozen item #1)
 -- ============================================================================
 
 -- 4.1 Add new columns
-ALTER TABLE public.residence_members
-  ADD COLUMN IF NOT EXISTS end_reason public.residence_membership_end_reason NULL;
+ALTER TABLE resident.residence_members
+  ADD COLUMN IF NOT EXISTS end_reason resident.residence_membership_end_reason NULL;
 
-ALTER TABLE public.residence_members
+ALTER TABLE resident.residence_members
   ADD COLUMN IF NOT EXISTS requested_end_date date NULL;
 
-ALTER TABLE public.residence_members
+ALTER TABLE resident.residence_members
   ADD COLUMN IF NOT EXISTS moveout_requested_at timestamptz NULL;
 
 -- 4.2 Add composite UNIQUE (id, tenant_id) for composite FK support (D-13)
-ALTER TABLE public.residence_members ADD CONSTRAINT residence_members_id_tenant_key UNIQUE (id, tenant_id);
+ALTER TABLE resident.residence_members ADD CONSTRAINT residence_members_id_tenant_key UNIQUE (id, tenant_id);
 
 -- 4.3 Add composite FK (property_id, tenant_id) → properties (id, tenant_id) (D-13)
-ALTER TABLE public.residence_members
+ALTER TABLE resident.residence_members
   ADD CONSTRAINT residence_members_property_composite_fk
-  FOREIGN KEY (property_id, tenant_id) REFERENCES public.properties(id, tenant_id);
+  FOREIGN KEY (property_id, tenant_id) REFERENCES resident.properties(id, tenant_id);
 
 -- 4.4 Drop old global UNIQUE (property_id, profile_id)
-ALTER TABLE public.residence_members DROP CONSTRAINT IF EXISTS residence_members_property_id_profile_id_key;
+ALTER TABLE resident.residence_members DROP CONSTRAINT IF EXISTS residence_members_property_id_profile_id_key;
 
 -- 4.5 Add partial unique: one open membership per (property, profile) pair
 CREATE UNIQUE INDEX IF NOT EXISTS residence_members_property_profile_open_uidx
-  ON public.residence_members(property_id, profile_id)
+  ON resident.residence_members(property_id, profile_id)
   WHERE status IN ('active', 'pending');
 
 -- 4.6 Add tenant-scoped one-active-primary unique (per doc 28 §6.9)
 CREATE UNIQUE INDEX IF NOT EXISTS idx_residence_members_one_primary_active
-  ON public.residence_members(tenant_id, profile_id)
+  ON resident.residence_members(tenant_id, profile_id)
   WHERE status = 'active' AND is_primary = true;
 
 -- 4.7 Closure completeness CHECK constraint
-ALTER TABLE public.residence_members
+ALTER TABLE resident.residence_members
   ADD CONSTRAINT residence_members_closure_complete
   CHECK (
     (status = 'revoked' AND end_date IS NOT NULL AND end_reason IS NOT NULL)
@@ -105,7 +105,7 @@ ALTER TABLE public.residence_members
   );
 
 -- 4.8 EXCLUDE constraint: no overlapping occupancy periods per (property, profile)
-ALTER TABLE public.residence_members
+ALTER TABLE resident.residence_members
   ADD CONSTRAINT residence_members_no_overlap
   EXCLUDE USING gist (
     property_id WITH =,
@@ -114,7 +114,7 @@ ALTER TABLE public.residence_members
   ) WHERE (start_date IS NOT NULL);
 
 -- 4.9 Trigger: closed residence_members rows are immutable
-CREATE OR REPLACE FUNCTION public.residence_members_closed_immutable()
+CREATE OR REPLACE FUNCTION resident.residence_members_closed_immutable()
 RETURNS trigger
 LANGUAGE plpgsql
 SET search_path = ''
@@ -128,62 +128,62 @@ BEGIN
 END;
 $$;
 
-DROP TRIGGER IF EXISTS trg_residence_members_closed_immutable ON public.residence_members;
+DROP TRIGGER IF EXISTS trg_residence_members_closed_immutable ON resident.residence_members;
 CREATE TRIGGER trg_residence_members_closed_immutable
-  BEFORE UPDATE ON public.residence_members
+  BEFORE UPDATE ON resident.residence_members
   FOR EACH ROW
-  EXECUTE FUNCTION public.residence_members_closed_immutable();
+  EXECUTE FUNCTION resident.residence_members_closed_immutable();
 
 -- 4.10 Add partial indexes for open membership lookups (per doc 28 §5.4)
 CREATE INDEX IF NOT EXISTS idx_residence_members_profile_open
-  ON public.residence_members(profile_id)
+  ON resident.residence_members(profile_id)
   WHERE status = 'active';
 
 CREATE INDEX IF NOT EXISTS idx_residence_members_property_open
-  ON public.residence_members(property_id)
+  ON resident.residence_members(property_id)
   WHERE status = 'active';
 
 -- ============================================================================
 -- 5. household_members — Non-Platform Household Persons (D-03 / doc 28 §6.3)
 -- ============================================================================
-CREATE TABLE IF NOT EXISTS public.household_members (
+CREATE TABLE IF NOT EXISTS resident.household_members (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id uuid NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
+  tenant_id uuid NOT NULL REFERENCES resident.tenants(id) ON DELETE CASCADE,
   property_id uuid NOT NULL,
-  responsible_profile_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE RESTRICT,
+  responsible_profile_id uuid NOT NULL REFERENCES resident.profiles(id) ON DELETE RESTRICT,
   full_name text NOT NULL,
   birth_date date,
-  relationship public.household_relationship NOT NULL,
-  status public.household_member_status NOT NULL DEFAULT 'active',
+  relationship resident.household_relationship NOT NULL,
+  status resident.household_member_status NOT NULL DEFAULT 'active',
   start_date date,
   end_date date,
   notes text,
-  linked_profile_id uuid NULL REFERENCES public.profiles(id) ON DELETE RESTRICT,
+  linked_profile_id uuid NULL REFERENCES resident.profiles(id) ON DELETE RESTRICT,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT household_members_period_valid CHECK (end_date IS NULL OR start_date IS NULL OR end_date >= start_date),
-  CONSTRAINT household_members_property_composite_fk FOREIGN KEY (property_id, tenant_id) REFERENCES public.properties(id, tenant_id)
+  CONSTRAINT household_members_property_composite_fk FOREIGN KEY (property_id, tenant_id) REFERENCES resident.properties(id, tenant_id)
 );
 
 -- 5.1 Indexes for household_members
-CREATE INDEX IF NOT EXISTS idx_household_members_property_status ON public.household_members(property_id, status);
-CREATE INDEX IF NOT EXISTS idx_household_members_responsible_status ON public.household_members(responsible_profile_id, status);
-CREATE INDEX IF NOT EXISTS idx_household_members_tenant_status ON public.household_members(tenant_id, status);
+CREATE INDEX IF NOT EXISTS idx_household_members_property_status ON resident.household_members(property_id, status);
+CREATE INDEX IF NOT EXISTS idx_household_members_responsible_status ON resident.household_members(responsible_profile_id, status);
+CREATE INDEX IF NOT EXISTS idx_household_members_tenant_status ON resident.household_members(tenant_id, status);
 
 -- 5.2 Partial unique: no duplicate linked active person per property
 CREATE UNIQUE INDEX IF NOT EXISTS household_members_property_linked_active_uidx
-  ON public.household_members(property_id, linked_profile_id)
+  ON resident.household_members(property_id, linked_profile_id)
   WHERE linked_profile_id IS NOT NULL AND status = 'active';
 
 -- 5.3 touch_updated_at trigger
-DROP TRIGGER IF EXISTS trg_household_members_touch_updated_at ON public.household_members;
+DROP TRIGGER IF EXISTS trg_household_members_touch_updated_at ON resident.household_members;
 CREATE TRIGGER trg_household_members_touch_updated_at
-  BEFORE UPDATE ON public.household_members
+  BEFORE UPDATE ON resident.household_members
   FOR EACH ROW
-  EXECUTE FUNCTION public.touch_updated_at();
+  EXECUTE FUNCTION resident.touch_updated_at();
 
 -- 5.4 Protected fields immutability trigger
-CREATE OR REPLACE FUNCTION public.household_members_protected_fields_immutable()
+CREATE OR REPLACE FUNCTION resident.household_members_protected_fields_immutable()
 RETURNS trigger
 LANGUAGE plpgsql
 SET search_path = ''
@@ -205,14 +205,14 @@ BEGIN
 END;
 $$;
 
-DROP TRIGGER IF EXISTS trg_household_members_protected_fields ON public.household_members;
+DROP TRIGGER IF EXISTS trg_household_members_protected_fields ON resident.household_members;
 CREATE TRIGGER trg_household_members_protected_fields
-  BEFORE UPDATE ON public.household_members
+  BEFORE UPDATE ON resident.household_members
   FOR EACH ROW
-  EXECUTE FUNCTION public.household_members_protected_fields_immutable();
+  EXECUTE FUNCTION resident.household_members_protected_fields_immutable();
 
 -- 5.5 Append-only: no deletes (soft-delete via status = 'former')
-CREATE OR REPLACE FUNCTION public.household_members_prevent_delete()
+CREATE OR REPLACE FUNCTION resident.household_members_prevent_delete()
 RETURNS trigger
 LANGUAGE plpgsql
 SET search_path = ''
@@ -223,14 +223,14 @@ BEGIN
 END;
 $$;
 
-DROP TRIGGER IF EXISTS trg_household_members_no_delete ON public.household_members;
+DROP TRIGGER IF EXISTS trg_household_members_no_delete ON resident.household_members;
 CREATE TRIGGER trg_household_members_no_delete
-  BEFORE DELETE ON public.household_members
+  BEFORE DELETE ON resident.household_members
   FOR EACH ROW
-  EXECUTE FUNCTION public.household_members_prevent_delete();
+  EXECUTE FUNCTION resident.household_members_prevent_delete();
 
 -- 5.6 is_household_responsible helper (doc 29 §4)
-CREATE OR REPLACE FUNCTION public.is_household_responsible(target_id uuid)
+CREATE OR REPLACE FUNCTION resident.is_household_responsible(target_id uuid)
 RETURNS boolean
 LANGUAGE sql
 STABLE
@@ -239,21 +239,21 @@ SET search_path = ''
 AS $$
   SELECT EXISTS (
     SELECT 1
-    FROM public.household_members AS hm
+    FROM resident.household_members AS hm
     WHERE hm.id = target_id
-      AND hm.responsible_profile_id = public.current_profile_id()
+      AND hm.responsible_profile_id = resident.current_profile_id()
       AND EXISTS (
         SELECT 1
-        FROM public.residence_members AS rm
+        FROM resident.residence_members AS rm
         WHERE rm.property_id = hm.property_id
-          AND rm.profile_id = public.current_profile_id()
+          AND rm.profile_id = resident.current_profile_id()
           AND rm.status = 'active'
       )
   );
 $$;
 
 -- 5.7 Cross-table platform-user duplication invariant (doc 28 §6.3, invariant 6)
-CREATE OR REPLACE FUNCTION public.prevent_platform_user_household_duplicate()
+CREATE OR REPLACE FUNCTION resident.prevent_platform_user_household_duplicate()
 RETURNS trigger
 LANGUAGE plpgsql
 SET search_path = ''
@@ -278,7 +278,7 @@ BEGIN
   IF TG_TABLE_NAME = 'household_members' THEN
     IF NEW.linked_profile_id IS NOT NULL AND NEW.status = 'active' THEN
       IF EXISTS (
-        SELECT 1 FROM public.residence_members
+        SELECT 1 FROM resident.residence_members
         WHERE property_id = NEW.property_id
           AND profile_id = NEW.linked_profile_id
           AND status IN ('active', 'pending')
@@ -292,7 +292,7 @@ BEGIN
   ELSIF TG_TABLE_NAME = 'residence_members' THEN
     IF NEW.status IN ('active', 'pending') THEN
       IF EXISTS (
-        SELECT 1 FROM public.household_members
+        SELECT 1 FROM resident.household_members
         WHERE property_id = NEW.property_id
           AND linked_profile_id = NEW.profile_id
           AND status = 'active'
@@ -311,37 +311,37 @@ $$;
 -- ============================================================================
 -- 6. Security & RLS Posture
 -- ============================================================================
-ALTER TABLE public.household_members ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.household_members FORCE ROW LEVEL SECURITY;
+ALTER TABLE resident.household_members ENABLE ROW LEVEL SECURITY;
+ALTER TABLE resident.household_members FORCE ROW LEVEL SECURITY;
 
 -- 6.1 Grants: SELECT only to authenticated (zero INSERT/UPDATE/DELETE grants)
-REVOKE ALL ON TABLE public.household_members FROM PUBLIC, anon, authenticated;
-GRANT SELECT ON TABLE public.household_members TO authenticated;
-GRANT EXECUTE ON FUNCTION public.is_household_responsible(uuid) TO authenticated;
+REVOKE ALL ON TABLE resident.household_members FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON TABLE resident.household_members TO authenticated;
+GRANT EXECUTE ON FUNCTION resident.is_household_responsible(uuid) TO authenticated;
 
 -- ============================================================================
 -- 7. RLS Policies — residence_members (extend)
 -- ============================================================================
 
 -- 7.1 INSERT — staff residences:write only
-DROP POLICY IF EXISTS residence_members_insert_policy ON public.residence_members;
-CREATE POLICY residence_members_insert_policy ON public.residence_members
+DROP POLICY IF EXISTS residence_members_insert_policy ON resident.residence_members;
+CREATE POLICY residence_members_insert_policy ON resident.residence_members
   FOR INSERT
   TO authenticated
   WITH CHECK (
-    public.has_tenant_permission(tenant_id, 'residences:write')
+    resident.has_tenant_permission(tenant_id, 'residences:write')
   );
 
 -- 7.2 UPDATE — staff residences:write only
-DROP POLICY IF EXISTS residence_members_update_policy ON public.residence_members;
-CREATE POLICY residence_members_update_policy ON public.residence_members
+DROP POLICY IF EXISTS residence_members_update_policy ON resident.residence_members;
+CREATE POLICY residence_members_update_policy ON resident.residence_members
   FOR UPDATE
   TO authenticated
   USING (
-    public.has_tenant_permission(tenant_id, 'residences:write')
+    resident.has_tenant_permission(tenant_id, 'residences:write')
   )
   WITH CHECK (
-    public.has_tenant_permission(tenant_id, 'residences:write')
+    resident.has_tenant_permission(tenant_id, 'residences:write')
   );
 
 -- Note: existing SELECT policies (self + residences:read) remain unchanged.
@@ -352,36 +352,36 @@ CREATE POLICY residence_members_update_policy ON public.residence_members
 -- ============================================================================
 
 -- 8.1 SELECT — co-household, responsible resident (active authority verified), staff household:read, platform admin
-DROP POLICY IF EXISTS household_members_select_policy ON public.household_members;
-CREATE POLICY household_members_select_policy ON public.household_members
+DROP POLICY IF EXISTS household_members_select_policy ON resident.household_members;
+CREATE POLICY household_members_select_policy ON resident.household_members
   FOR SELECT
   TO authenticated
   USING (
-    public.is_active_residence_member(property_id)
-    OR public.is_household_responsible(id)
-    OR public.has_tenant_permission(tenant_id, 'household:read')
-    OR public.is_platform_admin()
+    resident.is_active_residence_member(property_id)
+    OR resident.is_household_responsible(id)
+    OR resident.has_tenant_permission(tenant_id, 'household:read')
+    OR resident.is_platform_admin()
   );
 
 -- 8.2 INSERT — staff household:write only
-DROP POLICY IF EXISTS household_members_insert_policy ON public.household_members;
-CREATE POLICY household_members_insert_policy ON public.household_members
+DROP POLICY IF EXISTS household_members_insert_policy ON resident.household_members;
+CREATE POLICY household_members_insert_policy ON resident.household_members
   FOR INSERT
   TO authenticated
   WITH CHECK (
-    public.has_tenant_permission(tenant_id, 'household:write')
+    resident.has_tenant_permission(tenant_id, 'household:write')
   );
 
 -- 8.3 UPDATE — staff household:write only
-DROP POLICY IF EXISTS household_members_update_policy ON public.household_members;
-CREATE POLICY household_members_update_policy ON public.household_members
+DROP POLICY IF EXISTS household_members_update_policy ON resident.household_members;
+CREATE POLICY household_members_update_policy ON resident.household_members
   FOR UPDATE
   TO authenticated
   USING (
-    public.has_tenant_permission(tenant_id, 'household:write')
+    resident.has_tenant_permission(tenant_id, 'household:write')
   )
   WITH CHECK (
-    public.has_tenant_permission(tenant_id, 'household:write')
+    resident.has_tenant_permission(tenant_id, 'household:write')
   );
 
 -- No DELETE policy — table is append-only (trigger-enforced).
@@ -389,14 +389,14 @@ CREATE POLICY household_members_update_policy ON public.household_members
 -- ============================================================================
 -- 9. Cross-Table Invariant — Platform-User Duplication Prevention (doc 28 §9 invariant 6)
 -- ============================================================================
-DROP TRIGGER IF EXISTS trg_household_members_no_platform_dup ON public.household_members;
+DROP TRIGGER IF EXISTS trg_household_members_no_platform_dup ON resident.household_members;
 CREATE TRIGGER trg_household_members_no_platform_dup
-  BEFORE INSERT OR UPDATE ON public.household_members
+  BEFORE INSERT OR UPDATE ON resident.household_members
   FOR EACH ROW
-  EXECUTE FUNCTION public.prevent_platform_user_household_duplicate();
+  EXECUTE FUNCTION resident.prevent_platform_user_household_duplicate();
 
-DROP TRIGGER IF EXISTS trg_residence_members_no_household_dup ON public.residence_members;
+DROP TRIGGER IF EXISTS trg_residence_members_no_household_dup ON resident.residence_members;
 CREATE TRIGGER trg_residence_members_no_household_dup
-  BEFORE INSERT OR UPDATE ON public.residence_members
+  BEFORE INSERT OR UPDATE ON resident.residence_members
   FOR EACH ROW
-  EXECUTE FUNCTION public.prevent_platform_user_household_duplicate();
+  EXECUTE FUNCTION resident.prevent_platform_user_household_duplicate();

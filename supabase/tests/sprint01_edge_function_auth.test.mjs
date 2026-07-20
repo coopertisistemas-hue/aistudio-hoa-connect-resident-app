@@ -295,14 +295,14 @@ async function main() {
 
     // SQL/RLS boundary: resident B cannot read resident A profile under JWT claims.
     const existCount = Number(
-      sql(`SELECT COUNT(*)::int FROM public.profiles WHERE id = '${IDS.residentA.profile}'`),
+      sql(`SELECT COUNT(*)::int FROM resident.profiles WHERE id = '${IDS.residentA.profile}'`),
     );
     const rlsRaw = sqlScript(`
 BEGIN;
 SELECT set_config('request.jwt.claim.role', 'authenticated', true);
 SELECT set_config('request.jwt.claim.sub', '${IDS.residentB.user}', true);
 SET LOCAL ROLE authenticated;
-SELECT COUNT(*)::int AS c FROM public.profiles WHERE id = '${IDS.residentA.profile}';
+SELECT COUNT(*)::int AS c FROM resident.profiles WHERE id = '${IDS.residentA.profile}';
 ROLLBACK;
 `);
     const rlsCount = Number(
@@ -458,13 +458,13 @@ ROLLBACK;
   // ─── EF-AUTH-12: Protected profile fields ───
   console.log('\n[EF-AUTH-12] Protected profile fields');
   {
-    const originalName = sql(`SELECT full_name FROM public.profiles WHERE id = '${IDS.residentA.profile}'`);
+    const originalName = sql(`SELECT full_name FROM resident.profiles WHERE id = '${IDS.residentA.profile}'`);
     const r = await callFn(baseUrl, anonKey, 'profile-update', 'PATCH', T.residentA, {
       full_name: 'evil-escalation',
       preferred_name: 'AnaSafe',
     });
     const afterRow = sql(
-      `SELECT full_name || '||' || COALESCE(preferred_name,'') FROM public.profiles WHERE id = '${IDS.residentA.profile}'`,
+      `SELECT full_name || '||' || COALESCE(preferred_name,'') FROM resident.profiles WHERE id = '${IDS.residentA.profile}'`,
     );
     const [afterName, preferredName] = afterRow.split('||');
     const ok =
@@ -501,7 +501,7 @@ BEGIN;
 SELECT set_config('request.jwt.claim.role', 'authenticated', true);
 SELECT set_config('request.jwt.claim.sub', '${IDS.residentA.user}', true);
 SET LOCAL ROLE authenticated;
-UPDATE public.profile_contacts
+UPDATE resident.profile_contacts
    SET verification_state = 'verified', verified_at = now()
  WHERE profile_id = '${IDS.residentA.profile}'
    AND contact_type = 'email'
@@ -519,25 +519,25 @@ COMMIT;
   console.log('\n[EF-AUTH-14] Audit event');
   {
     const beforeCount = Number(
-      sql(`SELECT COUNT(*)::int FROM public.audit_events WHERE actor_profile_id = '${IDS.residentA.profile}' AND action = 'profile.update.self'`),
+      sql(`SELECT COUNT(*)::int FROM resident.audit_events WHERE actor_profile_id = '${IDS.residentA.profile}' AND action = 'profile.update.self'`),
     );
     const r = await callFn(baseUrl, anonKey, 'profile-update', 'PATCH', T.residentA, {
       preferred_name: `AuditTest-${Date.now()}`,
     });
     const afterRow = sql(`
       SELECT id || '|' || action || '|' || COALESCE(source,'')
-      FROM public.audit_events
+      FROM resident.audit_events
       WHERE actor_profile_id = '${IDS.residentA.profile}' AND action = 'profile.update.self'
       ORDER BY created_at DESC
       LIMIT 1
     `);
     const afterCount = Number(
-      sql(`SELECT COUNT(*)::int FROM public.audit_events WHERE actor_profile_id = '${IDS.residentA.profile}' AND action = 'profile.update.self'`),
+      sql(`SELECT COUNT(*)::int FROM resident.audit_events WHERE actor_profile_id = '${IDS.residentA.profile}' AND action = 'profile.update.self'`),
     );
     const [auditId, action, source] = (afterRow || '').split('|');
     const created = r.status === 200 && Boolean(auditId) && afterCount >= beforeCount + 1;
     const immutable = auditId
-      ? !sqlOk(`UPDATE public.audit_events SET action = 'tamper' WHERE id = '${auditId}'`)
+      ? !sqlOk(`UPDATE resident.audit_events SET action = 'tamper' WHERE id = '${auditId}'`)
       : false;
 
     record('EF-AUTH-14', 'profile-update', 'residentA', 200, r.status, r.body?.error?.code, created && immutable, {

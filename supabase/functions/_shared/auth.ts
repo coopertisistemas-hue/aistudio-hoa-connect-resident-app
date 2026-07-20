@@ -29,6 +29,7 @@ export async function buildRequestContext(request: Request): Promise<RequestCont
     requireEnv(supabaseUrl, 'SUPABASE_URL'),
     requireEnv(anonKey, 'SUPABASE_ANON_KEY'),
     {
+      db: { schema: 'resident' },
       global: {
         headers: {
           Authorization: request.headers.get('Authorization') ?? '',
@@ -45,6 +46,7 @@ export async function buildRequestContext(request: Request): Promise<RequestCont
     requireEnv(supabaseUrl, 'SUPABASE_URL'),
     requireEnv(serviceRoleKey, 'SUPABASE_SERVICE_ROLE_KEY'),
     {
+      db: { schema: 'resident' },
       auth: {
         persistSession: false,
         autoRefreshToken: false,

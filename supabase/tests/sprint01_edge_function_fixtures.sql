@@ -64,16 +64,16 @@ AND NOT EXISTS (
     AND i.provider = 'email'
 );
 
-INSERT INTO public.tenants (id, legal_name, display_name, slug, status)
+INSERT INTO resident.tenants (id, legal_name, display_name, slug, status)
 VALUES ('11111111-1111-1111-1111-222222222222', 'Assoc Residencial B', 'Residencial B', 'residencial-b', 'active')
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO public.properties (id, tenant_id, label, nickname, address_line1, city, state, unit_identifier, block_identifier, status)
+INSERT INTO resident.properties (id, tenant_id, label, nickname, address_line1, city, state, unit_identifier, block_identifier, status)
 VALUES ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '11111111-1111-1111-1111-222222222222',
   'Casa 100', 'Casa Bloco 1', 'Rua B, 100', 'Curitiba', 'PR', 'Casa 100', 'Bloco 1', 'active')
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO public.profiles (id, user_id, full_name, preferred_name, avatar_url, status, locale, timezone)
+INSERT INTO resident.profiles (id, user_id, full_name, preferred_name, avatar_url, status, locale, timezone)
 VALUES
   ('20000000-0000-0000-0000-000000000011', '10000000-0000-0000-0000-000000000011', 'Bruno Resident B', 'Bruno', NULL, 'active', 'pt-BR', 'America/Sao_Paulo'),
   ('20000000-0000-0000-0000-000000000022', '10000000-0000-0000-0000-000000000022', 'Revoked User', 'Revoked', NULL, 'active', 'pt-BR', 'America/Sao_Paulo'),
@@ -81,7 +81,7 @@ VALUES
   ('20000000-0000-0000-0000-000000000044', '10000000-0000-0000-0000-000000000044', 'Unrelated User', 'Unrelated', NULL, 'active', 'pt-BR', 'America/Sao_Paulo')
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO public.residence_members (id, tenant_id, property_id, profile_id, role, status, is_primary, start_date, end_date, end_reason)
+INSERT INTO resident.residence_members (id, tenant_id, property_id, profile_id, role, status, is_primary, start_date, end_date, end_reason)
 VALUES
   ('60000000-0000-0000-0000-000000000002', '11111111-1111-1111-1111-222222222222',
    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '20000000-0000-0000-0000-000000000011',
@@ -94,7 +94,7 @@ VALUES
    'resident', 'active', false, CURRENT_DATE - 30, NULL, NULL)
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO public.tenant_members (id, tenant_id, profile_id, role, status)
+INSERT INTO resident.tenant_members (id, tenant_id, profile_id, role, status)
 VALUES
   ('50000000-0000-0000-0000-000000000002', '11111111-1111-1111-1111-222222222222',
    '20000000-0000-0000-0000-000000000044', 'association_viewer', 'active')

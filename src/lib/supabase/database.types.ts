@@ -1476,6 +1476,10 @@ export type Database = {
         Args: { target_tenant_id: string }
         Returns: boolean
       }
+      is_household_responsible: {
+        Args: { target_id: string }
+        Returns: boolean
+      }
       is_platform_admin: { Args: never; Returns: boolean }
       log_audit_event: {
         Args: {

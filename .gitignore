@@ -47,3 +47,4 @@ auto-imports.d.ts
 *.temp
 .cache/
 .vercel/
+.env*
