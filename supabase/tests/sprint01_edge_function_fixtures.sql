@@ -81,17 +81,17 @@ VALUES
   ('20000000-0000-0000-0000-000000000044', '10000000-0000-0000-0000-000000000044', 'Unrelated User', 'Unrelated', NULL, 'active', 'pt-BR', 'America/Sao_Paulo')
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO public.residence_members (id, tenant_id, property_id, profile_id, role, status, is_primary, start_date)
+INSERT INTO public.residence_members (id, tenant_id, property_id, profile_id, role, status, is_primary, start_date, end_date, end_reason)
 VALUES
   ('60000000-0000-0000-0000-000000000002', '11111111-1111-1111-1111-222222222222',
    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '20000000-0000-0000-0000-000000000011',
-   'resident', 'active', true, CURRENT_DATE - 30),
+   'resident', 'active', true, CURRENT_DATE - 30, NULL, NULL),
   ('60000000-0000-0000-0000-000000000003', '11111111-1111-1111-1111-111111111111',
    'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '20000000-0000-0000-0000-000000000022',
-   'resident', 'revoked', false, CURRENT_DATE - 60),
+   'resident', 'revoked', false, CURRENT_DATE - 60, CURRENT_DATE - 30, 'administrative'),
   ('60000000-0000-0000-0000-000000000004', '11111111-1111-1111-1111-111111111111',
    'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '20000000-0000-0000-0000-000000000033',
-   'resident', 'active', false, CURRENT_DATE - 30)
+   'resident', 'active', false, CURRENT_DATE - 30, NULL, NULL)
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO public.tenant_members (id, tenant_id, profile_id, role, status)
