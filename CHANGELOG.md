@@ -63,8 +63,8 @@ All notable changes to HOA Connect Resident App will be documented in this file.
 
 ### Database
 
-- Created financial domain schema: 12 tables, 5 enums, comprehensive RLS
-- **Enums:** `invoice_status`, `payment_status`, `payment_method_type`, `financial_event_type`, `adjustment_category`
+- Created financial domain schema: 12 tables, 8 enums, comprehensive RLS
+- **Enums:** `invoice_status`, `payment_status`, `payment_method_type`, `financial_event_type`, `adjustment_category`, `billing_account_status`, `billing_cycle_status`, `invoice_item_category`
 - **Tables:** `billing_accounts`, `billing_cycles`, `invoices`, `invoice_items`, `payment_intents`, `payment_methods`, `payment_transactions`, `payment_receipts`, `payment_provider_events`, `ledger_entries`, `financial_adjustments`, `financial_audit_log`
 - **Helper Function:** `is_billing_account_owner(target_billing_account_id)`
 - Ledger-first architecture: every financial event generates immutable ledger entries

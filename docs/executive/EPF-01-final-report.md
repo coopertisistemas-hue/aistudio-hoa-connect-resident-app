@@ -1,8 +1,11 @@
-# EPF-01 — Financial Domain Foundation — Final Report (EPF-01R Revised)
+# EPF-01 — Financial Domain Foundation — Final Report (EPF-01R Revised, DAP-01 Aligned)
 
 > **EPF-01R Note**: This document has been revised by EPF-01R (Certification Remediation) to
 > align with independently verified repository state. Unverified claims have been removed.
 > See remediation findings at the end of this document.
+>
+> **DAP-01 Note**: This document has been further updated by DAP-01 (Documentation Alignment Patch)
+> to correct all architectural metrics and repository metadata to match the verified repository state.
 
 ## Executive Summary
 
@@ -26,10 +29,10 @@ No Edge Functions, payment processing, or data flows are wired for production.
 |----------|-------|
 | Repository | https://github.com/coopertisistemas-hue/aistudio-hoa-connect-resident-app.git |
 | Branch | `sprint-01-foundation-identity` |
-| HEAD Commit | `8b2d748` (EPF-01 + EPF-01R remediations committed) |
+| HEAD Commit | `ca344c2` (DAP-01 — Documentation Alignment Patch) |
 | Certified Tag | `residence-core-v1.0.0-certified` (commit `e7c6d13`) |
 | Working Tree | Clean |
-| Ahead/Behind | 1 commit ahead of origin (EPF-01 + EPF-01R not yet pushed) |
+| Ahead/Behind | 3 commits ahead of origin / 0 behind |
 
 ---
 
@@ -86,14 +89,17 @@ triggers are active. Ledger entries will be written when Edge Functions are impl
 | `is_billing_account_owner(uuid)` | Checks if current profile has active residence membership in the property linked to a billing account |
 | `log_financial_audit(...)` | Writes an immutable financial audit entry |
 
-### Database — Triggers
+### Database — Triggers (EPF-01: 20 Physical Triggers)
 
 | Trigger Type | Tables | Count |
 |-------------|--------|-------|
 | `touch_updated_at` | `billing_accounts`, `billing_cycles`, `invoices`, `invoice_items`, `payment_intents`, `payment_methods`, `payment_transactions`, `financial_adjustments` | 8 |
 | Immutable fields | `billing_accounts`, `invoices` | 2 |
 | Status transition | `invoices` (10-state state machine) | 1 |
-| Immutable entity | `payment_transactions` (confirmed), `payment_receipts`, `payment_provider_events`, `ledger_entries`, `financial_audit_log` | 5 |
+| Immutable entity (UPDATE) | `payment_transactions` (confirmed), `payment_receipts`, `payment_provider_events`, `ledger_entries`, `financial_audit_log` | 5 |
+| Immutable entity (DELETE) | `payment_receipts`, `payment_provider_events`, `ledger_entries`, `financial_audit_log` | 4 |
+
+**EPF-01 Physical Trigger Total: 20** (verified by independent source inspection of `20260721000000_sprint03_epf01_financial_domain.sql`)
 
 ### TypeScript — 6 New Files
 
@@ -250,6 +256,11 @@ Pre-existing issues (certified Sprint 1/2 baseline):
 EPF-01 new lint issues: 0 (remediated by EPF-01R)
 ```
 
+> **Governance Note — Baseline Lint Findings**: Repository-wide lint findings (2 errors, 4 warnings)
+> are inherited from the certified Residence Core baseline (`residence-core-v1.0.0-certified`).
+> EPF-01 introduced zero additional lint violations. These findings remain outside the scope of
+> EPF-01 and shall be addressed under an independent technical debt work item.
+
 ### supabase db reset
 ```
 Status: Completed successfully
@@ -356,5 +367,6 @@ Certification authority remains exclusively with the independent Codex audit.
 ---
 
 *EPF-01R — Financial Domain Foundation Remediation — Remediation Complete*
+*DAP-01 — Documentation Alignment Patch — Applied 2026-07-21*
 *Date: 2026-07-21*
 *Next Step: Independent Codex Re-Certification*
