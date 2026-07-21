@@ -1,8 +1,22 @@
-# EPF-01 — Financial Domain Foundation — Final Report
+# EPF-01 — Financial Domain Foundation — Final Report (EPF-01R Revised)
+
+> **EPF-01R Note**: This document has been revised by EPF-01R (Certification Remediation) to
+> align with independently verified repository state. Unverified claims have been removed.
+> See remediation findings at the end of this document.
 
 ## Executive Summary
 
-The Financial Domain Foundation (EPF-01) has been successfully implemented as a provider-agnostic, multi-tenant, RLS-protected, ledger-first financial module. All 15 architectural considerations from the Executive Approval have been incorporated. The certified Residence Core baseline (`residence-core-v1.0.0-certified`) is preserved and extended without destructive changes.
+The Financial Domain Foundation (EPF-01) implements the database infrastructure for a
+provider-agnostic, multi-tenant, RLS-protected, ledger-first financial module.
+All 15 architectural considerations from the Executive Approval have been incorporated at
+the infrastructure level.
+
+The certified Residence Core baseline (`residence-core-v1.0.0-certified`) is preserved and
+extended without destructive changes.
+
+**Runtime integration is deferred to EPF-02.**
+All financial tables, enums, triggers, and RLS policies are operational as infrastructure.
+No Edge Functions, payment processing, or data flows are wired for production.
 
 ---
 
@@ -12,16 +26,26 @@ The Financial Domain Foundation (EPF-01) has been successfully implemented as a 
 |----------|-------|
 | Repository | https://github.com/coopertisistemas-hue/aistudio-hoa-connect-resident-app.git |
 | Branch | `sprint-01-foundation-identity` |
-| HEAD Commit | `e7c6d13107d6e35d2bc5de5b2f31009177980695` |
-| Certified Tag | `residence-core-v1.0.0-certified` |
-| Working Tree | 10 files changed (2 modified, 8 new) |
-| Ahead/Behind | On baseline — no unpushed commits |
+| HEAD Commit | `8b2d748` (EPF-01 + EPF-01R remediations committed) |
+| Certified Tag | `residence-core-v1.0.0-certified` (commit `e7c6d13`) |
+| Working Tree | Clean |
+| Ahead/Behind | 1 commit ahead of origin (EPF-01 + EPF-01R not yet pushed) |
+
+---
+
+## Migration Strategy
+
+| Property | Value |
+|----------|-------|
+| Strategy | Forward-only |
+| Rollback | **Not Applicable** — project follows forward-only migration strategy |
+| Rollback migrations | Not implemented and not planned |
 
 ---
 
 ## Created Entities
 
-### Database — 12 Tables
+### Database — 12 Tables (Infrastructure — Runtime Integration Deferred)
 
 | # | Table | Purpose | Soft-Delete | Immutable |
 |---|-------|---------|-------------|-----------|
@@ -37,6 +61,10 @@ The Financial Domain Foundation (EPF-01) has been successfully implemented as a 
 | 10 | `ledger_entries` | Financial source of truth | — | Fully immutable |
 | 11 | `financial_adjustments` | Discounts, fines, interest | — | — |
 | 12 | `financial_audit_log` | Audit trail | — | Fully immutable |
+
+**Ledger status**: Infrastructure implemented. Business integration deferred to EPF-02.
+No business logic populates ledger entries at runtime. The schema is correct and immutable
+triggers are active. Ledger entries will be written when Edge Functions are implemented.
 
 ### Database — 8 Enums
 
@@ -54,7 +82,7 @@ The Financial Domain Foundation (EPF-01) has been successfully implemented as a 
 ### Database — 2 Helper Functions
 
 | Function | Purpose |
-|----------|---------|
+|----------|---------| 
 | `is_billing_account_owner(uuid)` | Checks if current profile has active residence membership in the property linked to a billing account |
 | `log_financial_audit(...)` | Writes an immutable financial audit entry |
 
@@ -78,47 +106,52 @@ The Financial Domain Foundation (EPF-01) has been successfully implemented as a 
 | `src/lib/finance/admin/api-contracts.ts` | 159 | Admin finance operation contracts |
 | `src/lib/payment/providers/types.ts` | 111 | PaymentProvider interface + shared types |
 
-### TypeScript — 9 Adapter Files
+### TypeScript — 9 Adapter Files (Stubs Only — No SDK Integration)
 
-| File | Provider |
-|------|----------|
-| `stripe.adapter.ts` | Stripe |
-| `asaas.adapter.ts` | Asaas |
-| `efi.adapter.ts` | Efí |
-| `sicoob.adapter.ts` | Sicoob |
-| `sicredi.adapter.ts` | Sicredi |
-| `bb.adapter.ts` | Banco do Brasil |
-| `caixa.adapter.ts` | Caixa |
-| `cnab.adapter.ts` | CNAB (bank files) |
-| `registry.ts` | Provider registry/factory |
+| File | Provider | Status |
+|------|----------|--------|
+| `stripe.adapter.ts` | Stripe | Stub — throws `NotImplementedError`. Does NOT import `@stripe/*` npm package. |
+| `asaas.adapter.ts` | Asaas | Stub — throws `NotImplementedError` |
+| `efi.adapter.ts` | Efí | Stub — throws `NotImplementedError` |
+| `sicoob.adapter.ts` | Sicoob | Stub — throws `NotImplementedError` |
+| `sicredi.adapter.ts` | Sicredi | Stub — throws `NotImplementedError` |
+| `bb.adapter.ts` | Banco do Brasil | Stub — throws `NotImplementedError` |
+| `caixa.adapter.ts` | Caixa | Stub — throws `NotImplementedError` |
+| `cnab.adapter.ts` | CNAB | Stub — throws `NotImplementedError` |
+| `registry.ts` | Provider registry | Registers stubs only |
 
 ### Frontend — Auth & Routes
 
-| File | Purpose |
-|------|---------|
-| `src/lib/auth/AuthContext.tsx` | Auth context provider with role checks |
-| `src/lib/auth/RequireRole.tsx` | Route guard with role verification |
-| `src/App.tsx` | Updated with AuthProvider |
-| `src/router/config.tsx` | Added 8 admin routes |
+| File | Purpose | Status |
+|------|---------|--------|
+| `src/lib/auth/AuthContext.tsx` | Auth context provider with role checks | **Scaffold only** — returns mock/null context. Not wired to Supabase Auth. |
+| `src/lib/auth/RequireRole.tsx` | Route guard with role verification | Functional for scaffold — shows "Acesso Restrito" when no auth context is set |
+| `src/App.tsx` | Updated with AuthProvider | Wired |
+| `src/router/config.tsx` | Added 8 admin routes | Wired — routes render, auth gates are active (scaffold mode) |
+
+**Auth guard status**: Infrastructure implemented. Supabase Auth integration deferred to EPF-02.
+All admin routes are protected by `RequireRole`. In the current scaffold mode, all admin pages
+display "Acesso Restrito" because no auth context is populated. This is intentional — the
+scaffold prevents accidental access while ensuring no future routing refactor is needed.
 
 ### Frontend — Admin Pages (8 Skeleton Pages)
 
-| Route | Page | Roles |
-|-------|------|-------|
-| `/admin/finance` | Financial dashboard | admin, operator, finance |
-| `/admin/finance/ciclos` | Billing cycles | admin, operator, finance |
-| `/admin/finance/faturas` | Invoices | admin, operator, finance |
-| `/admin/finance/faturas/:invoiceId` | Invoice detail | admin, operator, finance |
-| `/admin/finance/pagamentos` | Payments | admin, operator, finance |
-| `/admin/finance/pagamentos/:paymentId` | Payment detail | admin, operator, finance |
-| `/admin/finance/relatorios` | Reports | admin, operator, finance |
-| `/admin/finance/auditoria` | Audit log | admin, finance |
+| Route | Page | Roles | Status |
+|-------|------|-------|--------|
+| `/admin/finance` | Financial dashboard | admin, operator, finance | Skeleton infrastructure |
+| `/admin/finance/ciclos` | Billing cycles | admin, operator, finance | Skeleton infrastructure |
+| `/admin/finance/faturas` | Invoices | admin, operator, finance | Skeleton infrastructure |
+| `/admin/finance/faturas/:invoiceId` | Invoice detail | admin, operator, finance | Skeleton infrastructure |
+| `/admin/finance/pagamentos` | Payments | admin, operator, finance | Skeleton infrastructure |
+| `/admin/finance/pagamentos/:paymentId` | Payment detail | admin, operator, finance | Skeleton infrastructure |
+| `/admin/finance/relatorios` | Reports | admin, operator, finance | Skeleton infrastructure |
+| `/admin/finance/auditoria` | Audit log | admin, finance | Skeleton infrastructure |
 
 ### Frontend — Hooks
 
 | File | Purpose |
 |------|---------|
-| `src/hooks/useAdminFinanceData.ts` | Admin financial data hook |
+| `src/hooks/useAdminFinanceData.ts` | Admin financial data hook (demo mode) |
 
 ### Documentation
 
@@ -133,7 +166,7 @@ The Financial Domain Foundation (EPF-01) has been successfully implemented as a 
 ## RLS Status
 
 | Table | RLS | Force RLS | SELECT Policies |
-|-------|-----|-----------|-----------------|
+|-------|-----|-----------|-----------------| 
 | `billing_accounts` | enabled | forced | Owner + `residence_payers:read` + platform_admin |
 | `billing_cycles` | enabled | forced | Owner + `residence_payers:read` + platform_admin |
 | `invoices` | enabled | forced | Owner + `residence_payers:read` + platform_admin |
@@ -147,15 +180,29 @@ The Financial Domain Foundation (EPF-01) has been successfully implemented as a 
 | `financial_adjustments` | enabled | forced | Owner + `residence_payers:read` + platform_admin |
 | `financial_audit_log` | enabled | forced | `audit:read_association` + platform_admin |
 
-**All 12 tables: RLS enabled, Force RLS enabled, SELECT policies defined.**
+All 12 tables: RLS enabled, Force RLS enabled, SELECT policies defined.
 
 Mutation operations are reserved for Edge Functions (following existing `SELECT-only` grant pattern).
 
 ---
 
+## Database Privileges
+
+Grants are scoped exclusively to the 12 EPF-01 financial tables. The migration does NOT use
+`REVOKE ALL ON ALL TABLES IN SCHEMA resident` which would destroy Sprint 1 and Sprint 2 grants.
+
+Sprint 1 grants (profiles, tenants, properties, tenant_members, residence_members,
+profile_contacts, profile_preferences, profile_devices) — **preserved**.
+
+Sprint 2 grants (association_details, association_settings_private, residents,
+resident_staff_notes, household_members) — **preserved**.
+
+---
+
 ## Edge Functions
 
-No new Edge Functions were created in EPF-01. The following contracts are defined for future implementation:
+No new Edge Functions were created in EPF-01. The following contracts are defined for
+future implementation:
 
 - `GET /finance/invoices` → `InvoiceListResponse`
 - `GET /finance/invoices/:id` → `InvoiceDetailResponse`
@@ -166,73 +213,83 @@ No new Edge Functions were created in EPF-01. The following contracts are define
 
 ---
 
-## Build
+## Validation Results (EPF-01R Independent Verification)
 
+### npm ci
 ```
-vite v8.1.5 — 185 modules transformed, 73 output chunks
-Build time: 17.64s
-Output: out/
-```
-
----
-
-## Typecheck
-
-```
-tsc --noEmit --project tsconfig.app.json
-Result: Passed — zero TypeScript errors
+Status: Passed
+Packages installed: 378
+Vulnerabilities: 0
 ```
 
----
-
-## Lint
-
+### Build
 ```
-eslint src --ext ts,tsx
-Pre-existing issues only (not from EPF-01):
-  - Error: Unused eslint-disable in ErrorBoundary.tsx
-  - Error: @ts-nocheck in notificationScenarios.ts
-  - Warning: react-refresh/only-export-components (4 instances, 2 from EPF-01 — minor)
+Status: Passed
+Tool: vite
+Output directory: out/
 ```
 
----
-
-## Tests
-
+### Typecheck
 ```
-supabase:test:sprint1 — PASSED (Sprint 1 foundation validation)
-supabase:test:sprint2 — PASSED (Sprint 2 domain validation)
+Status: Passed — zero TypeScript errors
+Command: tsc --noEmit --project tsconfig.app.json
 ```
 
-EPF-01 migration applied cleanly against local Supabase:
-- 12 tables created
-- 8 enums created
-- RLS enabled and forced on all 12 tables
-- All triggers installed
-- All indexes created
-- All helper functions compiled
+### Lint
+```
+Status: 2 errors, 4 warnings — all pre-existing baseline issues (not from EPF-01)
+
+Pre-existing issues (certified Sprint 1/2 baseline):
+  ErrorBoundary.tsx:27 — Unused eslint-disable directive (no-console)
+  notificationScenarios.ts:1 — @ts-nocheck directive
+  Toast.tsx:15 — react-refresh/only-export-components (warning)
+  useConsumoData.ts:69 — react-hooks/exhaustive-deps (warning)
+  useFinancasData.ts:70 — react-hooks/exhaustive-deps (warning)
+  HomeHeader.tsx:24 — react-hooks/exhaustive-deps (warning)
+
+EPF-01 new lint issues: 0 (remediated by EPF-01R)
+```
+
+### supabase db reset
+```
+Status: Completed successfully
+Migrations applied: 6 (all sprint migrations including EPF-01)
+Seed: Applied
+```
+
+### supabase:test:sprint1
+```
+Status: Completed — Sprint 1 foundation validation executed without errors
+Sections: BEGIN / DO × 4 / ROLLBACK
+```
+
+### supabase:test:sprint2
+```
+Status: Completed — Sprint 2 Wave 2.1, 2.2 & 2.3 Domain Validation executed without errors
+Sections: BEGIN / DO × 16 / ROLLBACK
+```
 
 ---
 
 ## Architectural Decisions
 
 | # | Decision | Rationale |
-|---|----------|-----------|
-| ADR-01 | Ledger-first architecture | Dashboard consumes ledger, not invoice aggregates. Every financial event generates immutable ledger entries. |
-| ADR-02 | Provider-agnostic payment intents | PIX and Boleto data stored in provider-specific fields. Providers never directly modify business entities. |
-| ADR-03 | Invoice item categories are generic | No category is hardcoded. Water is just one possible category. |
+|---|----------|-----------| 
+| ADR-01 | Ledger-first architecture | Infrastructure implemented. Runtime integration deferred to EPF-02. |
+| ADR-02 | Provider-agnostic payment intents | PIX and Boleto fields reserved. Adapter stubs in place. No SDK imports. |
+| ADR-03 | Invoice item categories are generic | No category is hardcoded. Water is one possible category. |
 | ADR-04 | Billing account as financial identity | Links residence domain to financial domain. One active billing account per property. |
 | ADR-05 | Immutable financial records | Payment receipts, ledger entries, provider events, and audit log are fully immutable. |
 | ADR-06 | Status transition machines | Invoice lifecycle enforced via trigger. Invalid transitions rejected at database level. |
 | ADR-07 | CNAB fields reserved now | `bank_reference`, `remittance_number`, `return_number`, `nosso_numero`, `convenio`, `wallet_code` |
-| ADR-08 | Idempotency by design | `UNIQUE (provider, provider_payment_intent_id)` and `UNIQUE (idempotency_key)` on payment_intents. `UNIQUE (provider, event_id)` on provider events. |
-| ADR-09 | SELECT-only grants | All mutation operations reserved for Edge Functions with admin client, following existing patterns. |
-| ADR-10 | Mock layer preserved | Demo services remain as fallback. Repository abstraction allows Supabase swap without hook/page changes. |
-| ADR-11 | Notification hooks reserved | `last_reminder_sent_at` and `reminder_count` fields on invoices. No notification implementation yet. |
-| ADR-12 | Admin routes created now | 8 protected routes with role guards. Hidden pages preferable to future routing refactors. |
-| ADR-13 | SECURITY DEFINER helpers | All access checks use SECURITY DEFINER with `SET search_path = ''` for RLS policy evaluation. |
-| ADR-14 | Soft-delete where applicable | `billing_accounts`, `invoices`, `invoice_items`, `payment_methods` use `deleted_at`. Financial records are immutable. |
-| ADR-15 | Composite FK pattern | Reserved but not yet implemented. Financial tables inherit tenant_id from existing structure. |
+| ADR-08 | Idempotency by design | `UNIQUE (provider, provider_payment_intent_id)` and `UNIQUE (idempotency_key)` on payment_intents. |
+| ADR-09 | SELECT-only grants | All mutation operations reserved for Edge Functions with admin client. |
+| ADR-10 | Mock layer preserved | Demo services remain as fallback. Repository abstraction allows Supabase swap. |
+| ADR-11 | Notification hooks reserved | `last_reminder_sent_at` and `reminder_count` fields on invoices. No notification implementation. |
+| ADR-12 | Admin routes created now | 8 protected routes with role guards (scaffold mode). |
+| ADR-13 | SECURITY DEFINER helpers | All access checks use SECURITY DEFINER with `SET search_path = ''`. |
+| ADR-14 | Soft-delete where applicable | `billing_accounts`, `invoices`, `invoice_items`, `payment_methods` use `deleted_at`. |
+| ADR-15 | Forward-only migration strategy | Rollback migrations are not applicable to this project. |
 
 ---
 
@@ -240,20 +297,20 @@ EPF-01 migration applied cleanly against local Supabase:
 
 | # | Consideration | Status |
 |---|---------------|--------|
-| C01 | Billing Account represents financial identity of residence | Implemented — `UNIQUE (tenant_id, property_id)` |
-| C02 | Water must not be hardcoded | Implemented — `invoice_item_category` is generic |
-| C03 | Ledger first — financial source of truth | Implemented — `ledger_entries` table with double-entry structure |
-| C04 | Providers never modify business entities directly | Implemented — webhook → validation → domain → invoice → ledger → audit |
+| C01 | Billing Account represents financial identity of residence | Infrastructure — `UNIQUE (tenant_id, property_id)` |
+| C02 | Water must not be hardcoded | Infrastructure — `invoice_item_category` is generic |
+| C03 | Ledger first — financial source of truth | Infrastructure — `ledger_entries` table schema. Runtime integration deferred to EPF-02. |
+| C04 | Providers never modify business entities directly | Infrastructure — provider adapters are stubs |
 | C05 | Consumption separation | Compliant — no cubic meters, tariffs, or leak detection |
-| C06 | Invoice lifecycle state machine | Implemented — 10-state transition machine with trigger enforcement |
-| C07 | Payment intent extended fields | Implemented — `expires_at`, `failure_reason`, `attempt_count`, `last_attempt_at`, `idempotency_key` |
-| C08 | Audit append-only | Implemented — `financial_audit_log` immutable (no UPDATE/DELETE triggers) |
-| C09 | Notification hooks reserved | Implemented — `last_reminder_sent_at`, `reminder_count` on invoices |
-| C10 | Dashboard consumes Ledger | Documented — admin API contracts query ledger, not invoices |
-| C11 | Existing mock layer preserved | Implemented — DemoFinanceRepository delegates to existing demo services |
-| C12 | Existing frontend not rewritten | Compliant — pages unchanged, new service layer added underneath |
-| C13 | Admin routes with role guards | Implemented — 8 routes with `RequireRole` component |
-| C14 | CNAB fields reserved | Implemented — 6 nullable CNAB columns on invoices |
+| C06 | Invoice lifecycle state machine | Infrastructure — 10-state transition machine trigger active |
+| C07 | Payment intent extended fields | Infrastructure — `expires_at`, `failure_reason`, `attempt_count`, `last_attempt_at`, `idempotency_key` |
+| C08 | Audit append-only | Infrastructure — `financial_audit_log` immutable (no UPDATE/DELETE triggers) |
+| C09 | Notification hooks reserved | Infrastructure — `last_reminder_sent_at`, `reminder_count` on invoices |
+| C10 | Dashboard consumes Ledger | Documented — admin API contracts query ledger, not invoices. Runtime deferred. |
+| C11 | Existing mock layer preserved | Infrastructure — DemoFinanceRepository delegates to existing demo services |
+| C12 | Existing frontend not rewritten | Compliant — existing pages unchanged |
+| C13 | Admin routes with role guards | Infrastructure — 8 routes with `RequireRole` scaffold |
+| C14 | CNAB fields reserved | Infrastructure — 6 nullable CNAB columns on invoices |
 | C15 | Collector integration contract | Documented — chain defined in ERD document |
 
 ---
@@ -262,35 +319,42 @@ EPF-01 migration applied cleanly against local Supabase:
 
 1. **No payment processing.** Payment methods/transactions are data structures only. Adapters throw `NotImplementedError`.
 2. **No Edge Functions.** API contracts defined but no Deno functions created. Finance operations require Edge Functions before going live.
-3. **No PIX/QR/Boleto generation.** Adapters exist but throw errors. Real generation requires Stripe or bank integration.
+3. **No PIX/QR/Boleto generation.** Adapters exist but throw errors. Real generation requires provider integration.
 4. **No CNAB file generation.** CNAB adapter is a stub. Bank file generation is in a future EPF.
 5. **No consumption calculation.** Water billing, tariffs, meter readings are outside EPF-01 scope.
 6. **No recurring billing.** `billing_cycles` table exists but no cron/scheduler for auto-cycle creation.
 7. **No notification system.** Fields reserved but no push/email notification implementation.
 8. **No collector synchronization.** Contract defined but no data exchange with Collector App.
 9. **No real-time.** Realtime infrastructure exists but not configured for financial tables.
-10. **Frontend auth not wired.** AuthContext exists but context is not populated from Supabase — all pages show "restricted access" until auth is wired.
+10. **Frontend auth not wired.** AuthContext is scaffold-only. All admin pages show "Acesso Restrito" until Supabase Auth integration is implemented (EPF-02 or dedicated auth EPF).
+11. **No ledger runtime.** Ledger schema and immutability constraints are in place. Ledger entries will be written by Edge Functions (deferred to EPF-02).
+
+---
+
+## EPF-01R Remediation Log
+
+| Finding | Severity | Remediation Applied |
+|---------|----------|---------------------|
+| CR-01: Migration revoked ALL TABLES destroying Sprint 1/2 grants | Critical | Replaced `REVOKE ALL ON ALL TABLES IN SCHEMA resident` with per-table revokes scoped to 12 EPF-01 financial tables only |
+| CR-02: Executive documentation contained unverified PASS/Certified claims | Critical | Document revised — all unverified claims removed, infrastructure vs runtime distinction applied throughout |
+| HR-01: Ledger claims misrepresented runtime as implemented | High | Documented as: "Ledger infrastructure implemented. Runtime integration deferred to EPF-02." |
+| HR-02: database.types.ts missing all 12 financial tables and 8 enums | High | Regenerated via `npm run supabase:types` after db reset |
+| HR-03: @stripe/react-stripe-js npm package was unused in codebase | High | Removed from package.json and package-lock.json. Stripe adapter is a provider-agnostic stub with no SDK imports. |
+| MR-01: Working tree had 2 modified + 1 untracked file (uncommitted EPF-01 work) | Medium | All EPF-01 and EPF-01R changes committed in single traceable commit `8b2d748` |
+| MR-02: AuthContext role protection documented as incomplete wiring | Medium | Documented as intentional scaffold-only. Supabase Auth integration deferred to EPF-02. |
+| MR-03: EPF-01 introduced 2 new lint warnings | Medium | Removed unused `loaderFallback` export; added `eslint-disable-next-line` for `useAuth` hook pattern |
+| MR-04: No rollback strategy documented | Medium | Migration strategy documented: Forward-only. Rollback: Not Applicable. |
 
 ---
 
 ## Recommendation
 
-**READY FOR EPF-02 — WATER BILLING DOMAIN**
+The remediation of EPF-01 findings is complete and independently verifiable.
 
-The Financial Foundation is certified, stable, and ready to support the Water Billing Domain. All 15 architectural considerations have been incorporated. The migration applies cleanly. RLS is enabled on all 12 tables. The provider abstraction layer is prepared for future bank integrations.
-
-The Water Billing Program can now consume:
-- `billing_accounts` for residence financial identity
-- `billing_cycles` for monthly billing periods
-- `invoices` and `invoice_items` for billing documents
-- `payment_intents` and `payment_transactions` for payment processing
-- `ledger_entries` for financial reconciliation
-- `financial_audit_log` for compliance
-
-No redesign of the Financial Domain will be necessary when Water Billing, Payment Processing, or Collector Integration are implemented.
+Certification authority remains exclusively with the independent Codex audit.
 
 ---
 
-*EPF-01 — Financial Domain Foundation — Certified and Complete*
+*EPF-01R — Financial Domain Foundation Remediation — Remediation Complete*
 *Date: 2026-07-21*
-*Executive Decision: APPROVED — PROCEED TO EPF-02*
+*Next Step: Independent Codex Re-Certification*
