@@ -24,11 +24,13 @@ export type PaymentStatus =
   | 'pending'
   | 'processing'
   | 'confirmed'
+  | 'partially_confirmed'
   | 'failed'
   | 'refunded'
   | 'partially_refunded'
   | 'under_review'
-  | 'not_reconciled';
+  | 'not_reconciled'
+  | 'cancelled';
 
 export type PaymentMethodType =
   | 'pix'
@@ -184,6 +186,7 @@ export interface PaymentIntentRecord {
   amount: number;
   status: PaymentStatus;
   provider: string;
+  methodType: PaymentMethodType;
   providerPaymentIntentId?: string;
   providerCheckoutUrl?: string;
   // PIX
@@ -193,6 +196,10 @@ export interface PaymentIntentRecord {
   providerBoletoUrl?: string;
   providerBoletoBarcode?: string;
   providerBoletoDigitableLine?: string;
+  // Provider configuration and reconciliation
+  providerConfigId?: string;
+  reconciliationId?: string;
+  rawProviderResponse?: Record<string, unknown>;
   // Lifecycle
   expiresAt?: string;
   failureReason?: string;
@@ -229,9 +236,13 @@ export interface PaymentTransactionRecord {
   amount: number;
   status: PaymentStatus;
   provider: string;
+  providerConfigId?: string;
   providerTransactionId?: string;
   paymentMethodType: PaymentMethodType;
   paidAt?: string;
+  settlementDate?: string;
+  reconciliationId?: string;
+  rawProviderResponse?: Record<string, unknown>;
   metadata: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;

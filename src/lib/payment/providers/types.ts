@@ -10,6 +10,7 @@
 // ============================================================================
 
 export type PaymentProviderId =
+  | 'mock'
   | 'stripe'
   | 'asaas'
   | 'efi'
@@ -38,7 +39,17 @@ export interface CreateBankSlipInput {
 export interface PaymentIntentResult {
   id: string;
   providerPaymentIntentId: string;
-  status: 'pending' | 'processing' | 'confirmed' | 'failed';
+  status:
+    | 'pending'
+    | 'processing'
+    | 'confirmed'
+    | 'partially_confirmed'
+    | 'failed'
+    | 'refunded'
+    | 'partially_refunded'
+    | 'under_review'
+    | 'not_reconciled'
+    | 'cancelled';
   // PIX
   pixCode?: string;
   pixQrBase64?: string;
@@ -51,6 +62,7 @@ export interface PaymentIntentResult {
   // Common
   checkoutUrl?: string;
   expiresAt?: string;
+  reconciliationId?: string;
   metadata?: Record<string, unknown>;
 }
 
@@ -71,7 +83,13 @@ export interface ConfirmPaymentResult {
   success: boolean;
   transactionId: string;
   providerTransactionId: string;
-  status: 'confirmed' | 'failed';
+  status:
+    | 'confirmed'
+    | 'partially_confirmed'
+    | 'failed'
+    | 'refunded'
+    | 'partially_refunded'
+    | 'cancelled';
   failureReason?: string;
 }
 

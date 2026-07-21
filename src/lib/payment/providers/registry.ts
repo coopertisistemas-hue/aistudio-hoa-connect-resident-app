@@ -6,6 +6,7 @@
 // Integrations are enabled in future EPF waves.
 
 import type { PaymentProvider, PaymentProviderId } from './types';
+import { mockAdapter } from './mock.adapter';
 import { stripeAdapter } from './stripe.adapter';
 import { asaasAdapter } from './asaas.adapter';
 import { efiAdapter } from './efi.adapter';
@@ -16,6 +17,7 @@ import { caixaAdapter } from './caixa.adapter';
 import { cnabAdapter } from './cnab.adapter';
 
 const providers: Record<PaymentProviderId, PaymentProvider> = {
+  mock: mockAdapter,
   stripe: stripeAdapter,
   asaas: asaasAdapter,
   efi: efiAdapter,
