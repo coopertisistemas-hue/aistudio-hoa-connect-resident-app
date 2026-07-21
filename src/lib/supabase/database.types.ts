@@ -34,6 +34,24 @@ export type Database = {
   }
   public: {
     Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
+  resident: {
+    Tables: {
       association_details: {
         Row: {
           address_line1: string | null
@@ -198,510 +216,238 @@ export type Database = {
           },
         ]
       }
-      d2_notifications: {
+      billing_accounts: {
         Row: {
-          body_key: string
-          category: string
-          created_at: string
-          id: string
-          params: Json
-          profile_id: string
-          read_at: string | null
-          tenant_id: string
-          title_key: string
-        }
-        Insert: {
-          body_key: string
-          category: string
-          created_at?: string
-          id: string
-          params?: Json
-          profile_id: string
-          read_at?: string | null
-          tenant_id: string
-          title_key: string
-        }
-        Update: {
-          body_key?: string
-          category?: string
-          created_at?: string
-          id?: string
-          params?: Json
-          profile_id?: string
-          read_at?: string | null
-          tenant_id?: string
-          title_key?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "d2_notifications_profile_id_fkey"
-            columns: ["profile_id"]
-            isOneToOne: false
-            referencedRelation: "d2_profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "d2_notifications_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "d2_tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      d2_platform_admins: {
-        Row: {
-          active: boolean
-          created_at: string
-          id: string
-          user_id: string
-        }
-        Insert: {
-          active?: boolean
-          created_at?: string
-          id: string
-          user_id: string
-        }
-        Update: {
-          active?: boolean
-          created_at?: string
-          id?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      d2_profile_contacts: {
-        Row: {
-          communication_preference_flags: Json
-          contact_type: string
           created_at: string
           deleted_at: string | null
-          display_value: string
+          external_reference: string | null
           id: string
-          invalidated_at: string | null
-          normalized_value: string
-          outdated_at: string | null
-          profile_id: string
+          metadata: Json
+          property_id: string
+          status: Database["resident"]["Enums"]["billing_account_status"]
+          tenant_id: string
           updated_at: string
-          verification_sent_at: string | null
-          verification_state: string
-          verified_at: string | null
         }
         Insert: {
-          communication_preference_flags?: Json
-          contact_type: string
           created_at?: string
           deleted_at?: string | null
-          display_value: string
-          id: string
-          invalidated_at?: string | null
-          normalized_value: string
-          outdated_at?: string | null
-          profile_id: string
+          external_reference?: string | null
+          id?: string
+          metadata?: Json
+          property_id: string
+          status?: Database["resident"]["Enums"]["billing_account_status"]
+          tenant_id: string
           updated_at?: string
-          verification_sent_at?: string | null
-          verification_state: string
-          verified_at?: string | null
         }
         Update: {
-          communication_preference_flags?: Json
-          contact_type?: string
           created_at?: string
           deleted_at?: string | null
-          display_value?: string
+          external_reference?: string | null
           id?: string
-          invalidated_at?: string | null
-          normalized_value?: string
-          outdated_at?: string | null
-          profile_id?: string
+          metadata?: Json
+          property_id?: string
+          status?: Database["resident"]["Enums"]["billing_account_status"]
+          tenant_id?: string
           updated_at?: string
-          verification_sent_at?: string | null
-          verification_state?: string
-          verified_at?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "d2_profile_contacts_profile_id_fkey"
-            columns: ["profile_id"]
+            foreignKeyName: "billing_accounts_property_id_fkey"
+            columns: ["property_id"]
             isOneToOne: false
-            referencedRelation: "d2_profiles"
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "billing_accounts_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
         ]
       }
-      d2_profile_correction_audit: {
+      billing_cycles: {
         Row: {
-          actor_user_id: string
+          billing_account_id: string
           created_at: string
-          field_name: string
+          cycle_end: string
+          cycle_start: string
+          due_date: string
           id: string
-          new_value: string
-          old_value: string
-          reason: string
-          target_profile_id: string
-        }
-        Insert: {
-          actor_user_id: string
-          created_at?: string
-          field_name: string
-          id?: string
-          new_value: string
-          old_value: string
-          reason: string
-          target_profile_id: string
-        }
-        Update: {
-          actor_user_id?: string
-          created_at?: string
-          field_name?: string
-          id?: string
-          new_value?: string
-          old_value?: string
-          reason?: string
-          target_profile_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "d2_profile_correction_audit_target_profile_id_fkey"
-            columns: ["target_profile_id"]
-            isOneToOne: false
-            referencedRelation: "d2_profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      d2_profiles: {
-        Row: {
-          birth_date: string
-          created_at: string
-          display_name: string | null
-          document: string
-          full_name: string
-          id: string
-          photo_path: string | null
-          preferred_name: string | null
-          pronoun_preference: string | null
-          status: string
+          metadata: Json
+          reference_period: string
+          status: Database["resident"]["Enums"]["billing_cycle_status"]
+          tenant_id: string
           updated_at: string
-          user_id: string
+          updated_by_profile_id: string | null
         }
         Insert: {
-          birth_date: string
+          billing_account_id: string
           created_at?: string
-          display_name?: string | null
-          document: string
-          full_name: string
-          id: string
-          photo_path?: string | null
-          preferred_name?: string | null
-          pronoun_preference?: string | null
-          status?: string
+          cycle_end: string
+          cycle_start: string
+          due_date: string
+          id?: string
+          metadata?: Json
+          reference_period: string
+          status?: Database["resident"]["Enums"]["billing_cycle_status"]
+          tenant_id: string
           updated_at?: string
-          user_id: string
+          updated_by_profile_id?: string | null
         }
         Update: {
-          birth_date?: string
+          billing_account_id?: string
           created_at?: string
-          display_name?: string | null
-          document?: string
-          full_name?: string
+          cycle_end?: string
+          cycle_start?: string
+          due_date?: string
           id?: string
-          photo_path?: string | null
-          preferred_name?: string | null
-          pronoun_preference?: string | null
-          status?: string
+          metadata?: Json
+          reference_period?: string
+          status?: Database["resident"]["Enums"]["billing_cycle_status"]
+          tenant_id?: string
           updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      d2_properties: {
-        Row: {
-          address: string
-          created_at: string
-          id: string
-          tenant_id: string
-        }
-        Insert: {
-          address: string
-          created_at?: string
-          id: string
-          tenant_id: string
-        }
-        Update: {
-          address?: string
-          created_at?: string
-          id?: string
-          tenant_id?: string
+          updated_by_profile_id?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "d2_properties_tenant_id_fkey"
+            foreignKeyName: "billing_cycles_billing_account_id_fkey"
+            columns: ["billing_account_id"]
+            isOneToOne: false
+            referencedRelation: "billing_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "billing_cycles_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
-            referencedRelation: "d2_tenants"
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "billing_cycles_updated_by_profile_id_fkey"
+            columns: ["updated_by_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
       }
-      d2_residence_members: {
+      financial_adjustments: {
         Row: {
+          amount: number
+          applied_by_profile_id: string | null
+          category: Database["resident"]["Enums"]["adjustment_category"]
           created_at: string
+          description: string
           id: string
-          is_primary: boolean
-          profile_id: string
-          property_id: string
-          role: string
-          status: string
+          invoice_id: string
+          metadata: Json
+          percentage: number | null
           tenant_id: string
+          updated_at: string
         }
         Insert: {
+          amount?: number
+          applied_by_profile_id?: string | null
+          category: Database["resident"]["Enums"]["adjustment_category"]
           created_at?: string
-          id: string
-          is_primary?: boolean
-          profile_id: string
-          property_id: string
-          role: string
-          status?: string
+          description: string
+          id?: string
+          invoice_id: string
+          metadata?: Json
+          percentage?: number | null
           tenant_id: string
+          updated_at?: string
         }
         Update: {
+          amount?: number
+          applied_by_profile_id?: string | null
+          category?: Database["resident"]["Enums"]["adjustment_category"]
           created_at?: string
+          description?: string
           id?: string
-          is_primary?: boolean
-          profile_id?: string
-          property_id?: string
-          role?: string
-          status?: string
+          invoice_id?: string
+          metadata?: Json
+          percentage?: number | null
           tenant_id?: string
+          updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "d2_residence_members_profile_id_fkey"
-            columns: ["profile_id"]
+            foreignKeyName: "financial_adjustments_applied_by_profile_id_fkey"
+            columns: ["applied_by_profile_id"]
             isOneToOne: false
-            referencedRelation: "d2_profiles"
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "d2_residence_members_property_id_fkey"
-            columns: ["property_id"]
+            foreignKeyName: "financial_adjustments_invoice_id_fkey"
+            columns: ["invoice_id"]
             isOneToOne: false
-            referencedRelation: "d2_properties"
+            referencedRelation: "invoices"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "d2_residence_members_tenant_id_fkey"
+            foreignKeyName: "financial_adjustments_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
-            referencedRelation: "d2_tenants"
+            referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
         ]
       }
-      d2_support_messages: {
+      financial_audit_log: {
         Row: {
-          content: string
+          action: Database["resident"]["Enums"]["financial_event_type"]
+          actor_profile_id: string | null
+          changes: Json
           created_at: string
-          delivery_sequence: number
+          entity_id: string
+          entity_type: string
           id: string
-          property_id: string
-          resident_access_revoked: boolean
-          resident_profile_id: string
-          resident_user_id: string
-          sender_profile_id: string | null
-          sender_type: string
-          support_request_id: string
+          metadata: Json
           tenant_id: string
         }
         Insert: {
-          content: string
+          action: Database["resident"]["Enums"]["financial_event_type"]
+          actor_profile_id?: string | null
+          changes?: Json
           created_at?: string
-          delivery_sequence?: never
-          id: string
-          property_id: string
-          resident_access_revoked?: boolean
-          resident_profile_id: string
-          resident_user_id: string
-          sender_profile_id?: string | null
-          sender_type: string
-          support_request_id: string
+          entity_id: string
+          entity_type: string
+          id?: string
+          metadata?: Json
           tenant_id: string
         }
         Update: {
-          content?: string
+          action?: Database["resident"]["Enums"]["financial_event_type"]
+          actor_profile_id?: string | null
+          changes?: Json
           created_at?: string
-          delivery_sequence?: never
+          entity_id?: string
+          entity_type?: string
           id?: string
-          property_id?: string
-          resident_access_revoked?: boolean
-          resident_profile_id?: string
-          resident_user_id?: string
-          sender_profile_id?: string | null
-          sender_type?: string
-          support_request_id?: string
+          metadata?: Json
           tenant_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "d2_support_messages_property_id_fkey"
-            columns: ["property_id"]
+            foreignKeyName: "financial_audit_log_actor_profile_id_fkey"
+            columns: ["actor_profile_id"]
             isOneToOne: false
-            referencedRelation: "d2_properties"
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "d2_support_messages_resident_profile_id_fkey"
-            columns: ["resident_profile_id"]
-            isOneToOne: false
-            referencedRelation: "d2_profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "d2_support_messages_sender_profile_id_fkey"
-            columns: ["sender_profile_id"]
-            isOneToOne: false
-            referencedRelation: "d2_profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "d2_support_messages_tenant_id_fkey"
+            foreignKeyName: "financial_audit_log_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
-            referencedRelation: "d2_tenants"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "support_messages_identity_projection_fk"
-            columns: [
-              "support_request_id",
-              "tenant_id",
-              "property_id",
-              "resident_profile_id",
-            ]
-            isOneToOne: false
-            referencedRelation: "d2_support_requests"
-            referencedColumns: ["id", "tenant_id", "property_id", "profile_id"]
-          },
-          {
-            foreignKeyName: "support_messages_request_fk"
-            columns: ["support_request_id"]
-            isOneToOne: false
-            referencedRelation: "d2_support_requests"
+            referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
         ]
-      }
-      d2_support_requests: {
-        Row: {
-          category: string
-          created_at: string
-          id: string
-          profile_id: string
-          property_id: string
-          protocol: string
-          status: string
-          subject: string
-          tenant_id: string
-        }
-        Insert: {
-          category: string
-          created_at?: string
-          id: string
-          profile_id: string
-          property_id: string
-          protocol: string
-          status?: string
-          subject: string
-          tenant_id: string
-        }
-        Update: {
-          category?: string
-          created_at?: string
-          id?: string
-          profile_id?: string
-          property_id?: string
-          protocol?: string
-          status?: string
-          subject?: string
-          tenant_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "d2_support_requests_profile_id_fkey"
-            columns: ["profile_id"]
-            isOneToOne: false
-            referencedRelation: "d2_profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "d2_support_requests_property_id_fkey"
-            columns: ["property_id"]
-            isOneToOne: false
-            referencedRelation: "d2_properties"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "d2_support_requests_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "d2_tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      d2_tenant_members: {
-        Row: {
-          created_at: string
-          id: string
-          role: string
-          status: string
-          tenant_id: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id: string
-          role: string
-          status?: string
-          tenant_id: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          role?: string
-          status?: string
-          tenant_id?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "d2_tenant_members_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "d2_tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      d2_tenants: {
-        Row: {
-          created_at: string
-          id: string
-          name: string
-        }
-        Insert: {
-          created_at?: string
-          id: string
-          name: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          name?: string
-        }
-        Relationships: []
       }
       household_members: {
         Row: {
@@ -713,10 +459,10 @@ export type Database = {
           linked_profile_id: string | null
           notes: string | null
           property_id: string
-          relationship: Database["public"]["Enums"]["household_relationship"]
+          relationship: Database["resident"]["Enums"]["household_relationship"]
           responsible_profile_id: string
           start_date: string | null
-          status: Database["public"]["Enums"]["household_member_status"]
+          status: Database["resident"]["Enums"]["household_member_status"]
           tenant_id: string
           updated_at: string
         }
@@ -729,10 +475,10 @@ export type Database = {
           linked_profile_id?: string | null
           notes?: string | null
           property_id: string
-          relationship: Database["public"]["Enums"]["household_relationship"]
+          relationship: Database["resident"]["Enums"]["household_relationship"]
           responsible_profile_id: string
           start_date?: string | null
-          status?: Database["public"]["Enums"]["household_member_status"]
+          status?: Database["resident"]["Enums"]["household_member_status"]
           tenant_id: string
           updated_at?: string
         }
@@ -745,10 +491,10 @@ export type Database = {
           linked_profile_id?: string | null
           notes?: string | null
           property_id?: string
-          relationship?: Database["public"]["Enums"]["household_relationship"]
+          relationship?: Database["resident"]["Enums"]["household_relationship"]
           responsible_profile_id?: string
           start_date?: string | null
-          status?: Database["public"]["Enums"]["household_member_status"]
+          status?: Database["resident"]["Enums"]["household_member_status"]
           tenant_id?: string
           updated_at?: string
         }
@@ -783,14 +529,604 @@ export type Database = {
           },
         ]
       }
+      invoice_items: {
+        Row: {
+          amount: number
+          category: Database["resident"]["Enums"]["invoice_item_category"]
+          created_at: string
+          deleted_at: string | null
+          description: string
+          id: string
+          invoice_id: string
+          metadata: Json
+          quantity: number
+          sort_order: number
+          tenant_id: string
+          unit_price: number
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          category?: Database["resident"]["Enums"]["invoice_item_category"]
+          created_at?: string
+          deleted_at?: string | null
+          description: string
+          id?: string
+          invoice_id: string
+          metadata?: Json
+          quantity?: number
+          sort_order?: number
+          tenant_id: string
+          unit_price?: number
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          category?: Database["resident"]["Enums"]["invoice_item_category"]
+          created_at?: string
+          deleted_at?: string | null
+          description?: string
+          id?: string
+          invoice_id?: string
+          metadata?: Json
+          quantity?: number
+          sort_order?: number
+          tenant_id?: string
+          unit_price?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_items_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_items_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoices: {
+        Row: {
+          amount: number
+          bank_reference: string | null
+          billing_account_id: string
+          billing_cycle_id: string | null
+          cancelled_at: string | null
+          convenio: string | null
+          created_at: string
+          deleted_at: string | null
+          document_number: string
+          due_date: string
+          id: string
+          issued_at: string | null
+          last_reminder_sent_at: string | null
+          metadata: Json
+          nosso_numero: string | null
+          paid_at: string | null
+          reminder_count: number
+          remittance_number: string | null
+          renegotiation_reference: string | null
+          replaced_by_invoice_id: string | null
+          return_number: string | null
+          status: Database["resident"]["Enums"]["invoice_status"]
+          tenant_id: string
+          updated_at: string
+          updated_by_profile_id: string | null
+          wallet_code: string | null
+          written_off_reason: string | null
+        }
+        Insert: {
+          amount?: number
+          bank_reference?: string | null
+          billing_account_id: string
+          billing_cycle_id?: string | null
+          cancelled_at?: string | null
+          convenio?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          document_number: string
+          due_date: string
+          id?: string
+          issued_at?: string | null
+          last_reminder_sent_at?: string | null
+          metadata?: Json
+          nosso_numero?: string | null
+          paid_at?: string | null
+          reminder_count?: number
+          remittance_number?: string | null
+          renegotiation_reference?: string | null
+          replaced_by_invoice_id?: string | null
+          return_number?: string | null
+          status?: Database["resident"]["Enums"]["invoice_status"]
+          tenant_id: string
+          updated_at?: string
+          updated_by_profile_id?: string | null
+          wallet_code?: string | null
+          written_off_reason?: string | null
+        }
+        Update: {
+          amount?: number
+          bank_reference?: string | null
+          billing_account_id?: string
+          billing_cycle_id?: string | null
+          cancelled_at?: string | null
+          convenio?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          document_number?: string
+          due_date?: string
+          id?: string
+          issued_at?: string | null
+          last_reminder_sent_at?: string | null
+          metadata?: Json
+          nosso_numero?: string | null
+          paid_at?: string | null
+          reminder_count?: number
+          remittance_number?: string | null
+          renegotiation_reference?: string | null
+          replaced_by_invoice_id?: string | null
+          return_number?: string | null
+          status?: Database["resident"]["Enums"]["invoice_status"]
+          tenant_id?: string
+          updated_at?: string
+          updated_by_profile_id?: string | null
+          wallet_code?: string | null
+          written_off_reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoices_billing_account_id_fkey"
+            columns: ["billing_account_id"]
+            isOneToOne: false
+            referencedRelation: "billing_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_billing_cycle_id_fkey"
+            columns: ["billing_cycle_id"]
+            isOneToOne: false
+            referencedRelation: "billing_cycles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_replaced_by_invoice_id_fkey"
+            columns: ["replaced_by_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_updated_by_profile_id_fkey"
+            columns: ["updated_by_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ledger_entries: {
+        Row: {
+          balance: number
+          created_at: string
+          credit_amount: number
+          debit_amount: number
+          description: string
+          entity_id: string | null
+          entity_type: string | null
+          entry_date: string
+          id: string
+          metadata: Json
+          reference_document: string | null
+          tenant_id: string
+        }
+        Insert: {
+          balance?: number
+          created_at?: string
+          credit_amount?: number
+          debit_amount?: number
+          description: string
+          entity_id?: string | null
+          entity_type?: string | null
+          entry_date?: string
+          id?: string
+          metadata?: Json
+          reference_document?: string | null
+          tenant_id: string
+        }
+        Update: {
+          balance?: number
+          created_at?: string
+          credit_amount?: number
+          debit_amount?: number
+          description?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          entry_date?: string
+          id?: string
+          metadata?: Json
+          reference_document?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ledger_entries_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payment_intents: {
+        Row: {
+          amount: number
+          attempt_count: number
+          created_at: string
+          expires_at: string | null
+          failure_reason: string | null
+          id: string
+          idempotency_key: string | null
+          invoice_id: string
+          last_attempt_at: string | null
+          metadata: Json
+          provider: string
+          provider_boleto_barcode: string | null
+          provider_boleto_digitable_line: string | null
+          provider_boleto_url: string | null
+          provider_checkout_url: string | null
+          provider_payment_intent_id: string | null
+          provider_pix_code: string | null
+          provider_pix_qr_base64: string | null
+          status: Database["resident"]["Enums"]["payment_status"]
+          tenant_id: string
+          updated_at: string
+          updated_by_profile_id: string | null
+        }
+        Insert: {
+          amount: number
+          attempt_count?: number
+          created_at?: string
+          expires_at?: string | null
+          failure_reason?: string | null
+          id?: string
+          idempotency_key?: string | null
+          invoice_id: string
+          last_attempt_at?: string | null
+          metadata?: Json
+          provider: string
+          provider_boleto_barcode?: string | null
+          provider_boleto_digitable_line?: string | null
+          provider_boleto_url?: string | null
+          provider_checkout_url?: string | null
+          provider_payment_intent_id?: string | null
+          provider_pix_code?: string | null
+          provider_pix_qr_base64?: string | null
+          status?: Database["resident"]["Enums"]["payment_status"]
+          tenant_id: string
+          updated_at?: string
+          updated_by_profile_id?: string | null
+        }
+        Update: {
+          amount?: number
+          attempt_count?: number
+          created_at?: string
+          expires_at?: string | null
+          failure_reason?: string | null
+          id?: string
+          idempotency_key?: string | null
+          invoice_id?: string
+          last_attempt_at?: string | null
+          metadata?: Json
+          provider?: string
+          provider_boleto_barcode?: string | null
+          provider_boleto_digitable_line?: string | null
+          provider_boleto_url?: string | null
+          provider_checkout_url?: string | null
+          provider_payment_intent_id?: string | null
+          provider_pix_code?: string | null
+          provider_pix_qr_base64?: string | null
+          status?: Database["resident"]["Enums"]["payment_status"]
+          tenant_id?: string
+          updated_at?: string
+          updated_by_profile_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_intents_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_intents_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_intents_updated_by_profile_id_fkey"
+            columns: ["updated_by_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payment_methods: {
+        Row: {
+          billing_account_id: string
+          created_at: string
+          deleted_at: string | null
+          display_name: string
+          id: string
+          is_active: boolean
+          is_default: boolean
+          metadata: Json
+          method_type: Database["resident"]["Enums"]["payment_method_type"]
+          provider: string
+          provider_payment_method_id: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          billing_account_id: string
+          created_at?: string
+          deleted_at?: string | null
+          display_name: string
+          id?: string
+          is_active?: boolean
+          is_default?: boolean
+          metadata?: Json
+          method_type?: Database["resident"]["Enums"]["payment_method_type"]
+          provider: string
+          provider_payment_method_id?: string | null
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          billing_account_id?: string
+          created_at?: string
+          deleted_at?: string | null
+          display_name?: string
+          id?: string
+          is_active?: boolean
+          is_default?: boolean
+          metadata?: Json
+          method_type?: Database["resident"]["Enums"]["payment_method_type"]
+          provider?: string
+          provider_payment_method_id?: string | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_methods_billing_account_id_fkey"
+            columns: ["billing_account_id"]
+            isOneToOne: false
+            referencedRelation: "billing_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_methods_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payment_provider_events: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          event_id: string
+          event_type: string
+          id: string
+          metadata: Json
+          payload: Json
+          processed_at: string | null
+          provider: string
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          event_id: string
+          event_type: string
+          id?: string
+          metadata?: Json
+          payload?: Json
+          processed_at?: string | null
+          provider: string
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          event_id?: string
+          event_type?: string
+          id?: string
+          metadata?: Json
+          payload?: Json
+          processed_at?: string | null
+          provider?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_provider_events_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payment_receipts: {
+        Row: {
+          amount_paid: number
+          created_at: string
+          id: string
+          invoice_id: string
+          issued_at: string
+          metadata: Json
+          payment_transaction_id: string
+          pdf_url: string | null
+          receipt_number: string
+          tenant_id: string
+        }
+        Insert: {
+          amount_paid: number
+          created_at?: string
+          id?: string
+          invoice_id: string
+          issued_at?: string
+          metadata?: Json
+          payment_transaction_id: string
+          pdf_url?: string | null
+          receipt_number: string
+          tenant_id: string
+        }
+        Update: {
+          amount_paid?: number
+          created_at?: string
+          id?: string
+          invoice_id?: string
+          issued_at?: string
+          metadata?: Json
+          payment_transaction_id?: string
+          pdf_url?: string | null
+          receipt_number?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_receipts_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_receipts_payment_transaction_id_fkey"
+            columns: ["payment_transaction_id"]
+            isOneToOne: false
+            referencedRelation: "payment_transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_receipts_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payment_transactions: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          invoice_id: string
+          metadata: Json
+          paid_at: string | null
+          payment_intent_id: string | null
+          payment_method_type: Database["resident"]["Enums"]["payment_method_type"]
+          provider: string
+          provider_transaction_id: string | null
+          status: Database["resident"]["Enums"]["payment_status"]
+          tenant_id: string
+          updated_at: string
+          updated_by_profile_id: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          invoice_id: string
+          metadata?: Json
+          paid_at?: string | null
+          payment_intent_id?: string | null
+          payment_method_type?: Database["resident"]["Enums"]["payment_method_type"]
+          provider: string
+          provider_transaction_id?: string | null
+          status?: Database["resident"]["Enums"]["payment_status"]
+          tenant_id: string
+          updated_at?: string
+          updated_by_profile_id?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          invoice_id?: string
+          metadata?: Json
+          paid_at?: string | null
+          payment_intent_id?: string | null
+          payment_method_type?: Database["resident"]["Enums"]["payment_method_type"]
+          provider?: string
+          provider_transaction_id?: string | null
+          status?: Database["resident"]["Enums"]["payment_status"]
+          tenant_id?: string
+          updated_at?: string
+          updated_by_profile_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_transactions_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_transactions_payment_intent_id_fkey"
+            columns: ["payment_intent_id"]
+            isOneToOne: false
+            referencedRelation: "payment_intents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_transactions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_transactions_updated_by_profile_id_fkey"
+            columns: ["updated_by_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       platform_role_assignments: {
         Row: {
           created_at: string
           id: string
           profile_id: string
           revoked_at: string | null
-          role: Database["public"]["Enums"]["platform_role"]
-          status: Database["public"]["Enums"]["platform_assignment_status"]
+          role: Database["resident"]["Enums"]["platform_role"]
+          status: Database["resident"]["Enums"]["platform_assignment_status"]
           updated_at: string
         }
         Insert: {
@@ -798,8 +1134,8 @@ export type Database = {
           id?: string
           profile_id: string
           revoked_at?: string | null
-          role: Database["public"]["Enums"]["platform_role"]
-          status?: Database["public"]["Enums"]["platform_assignment_status"]
+          role: Database["resident"]["Enums"]["platform_role"]
+          status?: Database["resident"]["Enums"]["platform_assignment_status"]
           updated_at?: string
         }
         Update: {
@@ -807,8 +1143,8 @@ export type Database = {
           id?: string
           profile_id?: string
           revoked_at?: string | null
-          role?: Database["public"]["Enums"]["platform_role"]
-          status?: Database["public"]["Enums"]["platform_assignment_status"]
+          role?: Database["resident"]["Enums"]["platform_role"]
+          status?: Database["resident"]["Enums"]["platform_assignment_status"]
           updated_at?: string
         }
         Relationships: [
@@ -823,7 +1159,7 @@ export type Database = {
       }
       profile_contacts: {
         Row: {
-          contact_type: Database["public"]["Enums"]["contact_type"]
+          contact_type: Database["resident"]["Enums"]["contact_type"]
           created_at: string
           deleted_at: string | null
           display_value: string
@@ -836,11 +1172,11 @@ export type Database = {
           profile_id: string
           updated_at: string
           verification_sent_at: string | null
-          verification_state: Database["public"]["Enums"]["verification_state"]
+          verification_state: Database["resident"]["Enums"]["verification_state"]
           verified_at: string | null
         }
         Insert: {
-          contact_type: Database["public"]["Enums"]["contact_type"]
+          contact_type: Database["resident"]["Enums"]["contact_type"]
           created_at?: string
           deleted_at?: string | null
           display_value: string
@@ -853,11 +1189,11 @@ export type Database = {
           profile_id: string
           updated_at?: string
           verification_sent_at?: string | null
-          verification_state?: Database["public"]["Enums"]["verification_state"]
+          verification_state?: Database["resident"]["Enums"]["verification_state"]
           verified_at?: string | null
         }
         Update: {
-          contact_type?: Database["public"]["Enums"]["contact_type"]
+          contact_type?: Database["resident"]["Enums"]["contact_type"]
           created_at?: string
           deleted_at?: string | null
           display_value?: string
@@ -870,7 +1206,7 @@ export type Database = {
           profile_id?: string
           updated_at?: string
           verification_sent_at?: string | null
-          verification_state?: Database["public"]["Enums"]["verification_state"]
+          verification_state?: Database["resident"]["Enums"]["verification_state"]
           verified_at?: string | null
         }
         Relationships: [
@@ -967,7 +1303,7 @@ export type Database = {
           id: string
           locale: string
           preferred_name: string | null
-          status: Database["public"]["Enums"]["profile_status"]
+          status: Database["resident"]["Enums"]["profile_status"]
           timezone: string
           updated_at: string
           user_id: string
@@ -979,7 +1315,7 @@ export type Database = {
           id?: string
           locale?: string
           preferred_name?: string | null
-          status?: Database["public"]["Enums"]["profile_status"]
+          status?: Database["resident"]["Enums"]["profile_status"]
           timezone?: string
           updated_at?: string
           user_id: string
@@ -991,7 +1327,7 @@ export type Database = {
           id?: string
           locale?: string
           preferred_name?: string | null
-          status?: Database["public"]["Enums"]["profile_status"]
+          status?: Database["resident"]["Enums"]["profile_status"]
           timezone?: string
           updated_at?: string
           user_id?: string
@@ -1013,7 +1349,7 @@ export type Database = {
           nickname: string | null
           postal_code: string | null
           state: string
-          status: Database["public"]["Enums"]["property_status"]
+          status: Database["resident"]["Enums"]["property_status"]
           tenant_id: string
           unit_identifier: string
           updated_at: string
@@ -1032,7 +1368,7 @@ export type Database = {
           nickname?: string | null
           postal_code?: string | null
           state: string
-          status?: Database["public"]["Enums"]["property_status"]
+          status?: Database["resident"]["Enums"]["property_status"]
           tenant_id: string
           unit_identifier: string
           updated_at?: string
@@ -1051,7 +1387,7 @@ export type Database = {
           nickname?: string | null
           postal_code?: string | null
           state?: string
-          status?: Database["public"]["Enums"]["property_status"]
+          status?: Database["resident"]["Enums"]["property_status"]
           tenant_id?: string
           unit_identifier?: string
           updated_at?: string
@@ -1071,7 +1407,7 @@ export type Database = {
           created_at: string
           end_date: string | null
           end_reason:
-            | Database["public"]["Enums"]["residence_membership_end_reason"]
+            | Database["resident"]["Enums"]["residence_membership_end_reason"]
             | null
           id: string
           is_primary: boolean
@@ -1080,9 +1416,9 @@ export type Database = {
           property_id: string
           requested_end_date: string | null
           revoked_at: string | null
-          role: Database["public"]["Enums"]["residence_role"]
+          role: Database["resident"]["Enums"]["residence_role"]
           start_date: string | null
-          status: Database["public"]["Enums"]["residence_membership_status"]
+          status: Database["resident"]["Enums"]["residence_membership_status"]
           tenant_id: string
           updated_at: string
         }
@@ -1090,7 +1426,7 @@ export type Database = {
           created_at?: string
           end_date?: string | null
           end_reason?:
-            | Database["public"]["Enums"]["residence_membership_end_reason"]
+            | Database["resident"]["Enums"]["residence_membership_end_reason"]
             | null
           id?: string
           is_primary?: boolean
@@ -1099,9 +1435,9 @@ export type Database = {
           property_id: string
           requested_end_date?: string | null
           revoked_at?: string | null
-          role: Database["public"]["Enums"]["residence_role"]
+          role: Database["resident"]["Enums"]["residence_role"]
           start_date?: string | null
-          status?: Database["public"]["Enums"]["residence_membership_status"]
+          status?: Database["resident"]["Enums"]["residence_membership_status"]
           tenant_id: string
           updated_at?: string
         }
@@ -1109,7 +1445,7 @@ export type Database = {
           created_at?: string
           end_date?: string | null
           end_reason?:
-            | Database["public"]["Enums"]["residence_membership_end_reason"]
+            | Database["resident"]["Enums"]["residence_membership_end_reason"]
             | null
           id?: string
           is_primary?: boolean
@@ -1118,9 +1454,9 @@ export type Database = {
           property_id?: string
           requested_end_date?: string | null
           revoked_at?: string | null
-          role?: Database["public"]["Enums"]["residence_role"]
+          role?: Database["resident"]["Enums"]["residence_role"]
           start_date?: string | null
-          status?: Database["public"]["Enums"]["residence_membership_status"]
+          status?: Database["resident"]["Enums"]["residence_membership_status"]
           tenant_id?: string
           updated_at?: string
         }
@@ -1217,7 +1553,7 @@ export type Database = {
           left_at: string | null
           profile_id: string
           registration_code: string | null
-          status: Database["public"]["Enums"]["resident_status"]
+          status: Database["resident"]["Enums"]["resident_status"]
           tenant_id: string
           updated_at: string
         }
@@ -1230,7 +1566,7 @@ export type Database = {
           left_at?: string | null
           profile_id: string
           registration_code?: string | null
-          status?: Database["public"]["Enums"]["resident_status"]
+          status?: Database["resident"]["Enums"]["resident_status"]
           tenant_id: string
           updated_at?: string
         }
@@ -1243,7 +1579,7 @@ export type Database = {
           left_at?: string | null
           profile_id?: string
           registration_code?: string | null
-          status?: Database["public"]["Enums"]["resident_status"]
+          status?: Database["resident"]["Enums"]["resident_status"]
           tenant_id?: string
           updated_at?: string
         }
@@ -1278,8 +1614,8 @@ export type Database = {
           joined_at: string
           profile_id: string
           revoked_at: string | null
-          role: Database["public"]["Enums"]["tenant_role"]
-          status: Database["public"]["Enums"]["tenant_membership_status"]
+          role: Database["resident"]["Enums"]["tenant_role"]
+          status: Database["resident"]["Enums"]["tenant_membership_status"]
           tenant_id: string
           updated_at: string
         }
@@ -1289,8 +1625,8 @@ export type Database = {
           joined_at?: string
           profile_id: string
           revoked_at?: string | null
-          role: Database["public"]["Enums"]["tenant_role"]
-          status?: Database["public"]["Enums"]["tenant_membership_status"]
+          role: Database["resident"]["Enums"]["tenant_role"]
+          status?: Database["resident"]["Enums"]["tenant_membership_status"]
           tenant_id: string
           updated_at?: string
         }
@@ -1300,8 +1636,8 @@ export type Database = {
           joined_at?: string
           profile_id?: string
           revoked_at?: string | null
-          role?: Database["public"]["Enums"]["tenant_role"]
-          status?: Database["public"]["Enums"]["tenant_membership_status"]
+          role?: Database["resident"]["Enums"]["tenant_role"]
+          status?: Database["resident"]["Enums"]["tenant_membership_status"]
           tenant_id?: string
           updated_at?: string
         }
@@ -1331,7 +1667,7 @@ export type Database = {
           locale: string
           metadata: Json
           slug: string
-          status: Database["public"]["Enums"]["tenant_status"]
+          status: Database["resident"]["Enums"]["tenant_status"]
           timezone: string
           updated_at: string
         }
@@ -1343,7 +1679,7 @@ export type Database = {
           locale?: string
           metadata?: Json
           slug: string
-          status?: Database["public"]["Enums"]["tenant_status"]
+          status?: Database["resident"]["Enums"]["tenant_status"]
           timezone?: string
           updated_at?: string
         }
@@ -1355,7 +1691,7 @@ export type Database = {
           locale?: string
           metadata?: Json
           slug?: string
-          status?: Database["public"]["Enums"]["tenant_status"]
+          status?: Database["resident"]["Enums"]["tenant_status"]
           timezone?: string
           updated_at?: string
         }
@@ -1384,82 +1720,20 @@ export type Database = {
       }
       current_profile_id: { Args: never; Returns: string }
       current_tenant_context: { Args: never; Returns: Json }
-      d2_apply_profile_correction: {
-        Args: {
-          audit_reason: string
-          replacement_document: string
-          target_profile_id: string
-        }
-        Returns: string
-      }
-      d2_create_support_message: {
-        Args: {
-          requested_property_id?: string
-          requested_resident_profile_id?: string
-          requested_tenant_id?: string
-          target_content: string
-          target_created_at?: string
-          target_sender_profile_id?: string
-          target_sender_type?: string
-          target_support_request_id: string
-        }
-        Returns: {
-          content: string
-          created_at: string
-          delivery_sequence: number
-          id: string
-          property_id: string
-          resident_access_revoked: boolean
-          resident_profile_id: string
-          resident_user_id: string
-          sender_profile_id: string | null
-          sender_type: string
-          support_request_id: string
-          tenant_id: string
-        }
-        SetofOptions: {
-          from: "*"
-          to: "d2_support_messages"
-          isOneToOne: true
-          isSetofReturn: false
-        }
-      }
-      d2_current_profile_id: { Args: never; Returns: string }
-      d2_is_active_resident_support_participant: {
-        Args: {
-          target_profile_id: string
-          target_property_id: string
-          target_tenant_id: string
-        }
-        Returns: boolean
-      }
-      d2_is_authorized_operator: {
-        Args: { target_tenant_id: string }
-        Returns: boolean
-      }
-      d2_is_platform_admin: { Args: never; Returns: boolean }
-      d2_is_support_request_author: {
-        Args: { target_request_id: string }
-        Returns: boolean
-      }
-      d2_is_tenant_member: {
-        Args: { target_tenant_id: string }
-        Returns: boolean
-      }
       has_platform_role: {
-        Args: { target_role: Database["public"]["Enums"]["platform_role"] }
+        Args: { target_role: Database["resident"]["Enums"]["platform_role"] }
         Returns: boolean
       }
       has_tenant_permission: {
         Args: {
-          target_permission: Database["public"]["Enums"]["tenant_permission"]
+          target_permission: Database["resident"]["Enums"]["tenant_permission"]
           target_tenant_id: string
         }
         Returns: boolean
       }
       has_tenant_role: {
         Args: {
-          target_role: Database["public"]["Enums"]["tenant_role"]
+          target_role: Database["resident"]["Enums"]["tenant_role"]
           target_tenant_id: string
         }
         Returns: boolean
@@ -1474,6 +1748,10 @@ export type Database = {
       }
       is_active_tenant_member: {
         Args: { target_tenant_id: string }
+        Returns: boolean
+      }
+      is_billing_account_owner: {
+        Args: { target_billing_account_id: string }
         Returns: boolean
       }
       is_household_responsible: {
@@ -1493,11 +1771,56 @@ export type Database = {
         }
         Returns: string
       }
-      show_limit: { Args: never; Returns: number }
-      show_trgm: { Args: { "": string }; Returns: string[] }
+      log_financial_audit: {
+        Args: {
+          p_action: Database["resident"]["Enums"]["financial_event_type"]
+          p_changes?: Json
+          p_entity_id: string
+          p_entity_type: string
+          p_metadata?: Json
+          p_tenant_id: string
+        }
+        Returns: string
+      }
     }
     Enums: {
+      adjustment_category:
+        | "discount"
+        | "interest"
+        | "fine"
+        | "credit"
+        | "debit"
+        | "correction"
+        | "other"
+      billing_account_status: "active" | "inactive" | "suspended" | "closed"
+      billing_cycle_status: "draft" | "open" | "closed" | "cancelled"
       contact_type: "email" | "phone" | "whatsapp"
+      financial_event_type:
+        | "invoice_created"
+        | "invoice_issued"
+        | "invoice_sent"
+        | "invoice_cancelled"
+        | "invoice_replaced"
+        | "invoice_renegotiated"
+        | "invoice_written_off"
+        | "reminder_sent"
+        | "payment_started"
+        | "payment_processing"
+        | "payment_confirmed"
+        | "payment_failed"
+        | "payment_refunded"
+        | "payment_partially_refunded"
+        | "webhook_received"
+        | "adjustment_applied"
+        | "discount_applied"
+        | "interest_applied"
+        | "fine_applied"
+        | "credit_applied"
+        | "receipt_generated"
+        | "status_updated"
+        | "manual_settlement"
+        | "billing_cycle_opened"
+        | "billing_cycle_closed"
       household_member_status: "active" | "inactive" | "former"
       household_relationship:
         | "spouse"
@@ -1507,6 +1830,44 @@ export type Database = {
         | "dependent"
         | "legal_charge"
         | "other"
+      invoice_item_category:
+        | "water"
+        | "association_fee"
+        | "maintenance"
+        | "reserve_fund"
+        | "penalty"
+        | "adjustment"
+        | "donation"
+        | "other_services"
+      invoice_status:
+        | "draft"
+        | "issued"
+        | "open"
+        | "payment_pending"
+        | "paid"
+        | "overdue"
+        | "cancelled"
+        | "replaced"
+        | "renegotiated"
+        | "written_off"
+      payment_method_type:
+        | "pix"
+        | "boleto"
+        | "credit_card"
+        | "debit_card"
+        | "bank_transfer"
+        | "cash"
+        | "manual"
+        | "other"
+      payment_status:
+        | "pending"
+        | "processing"
+        | "confirmed"
+        | "failed"
+        | "refunded"
+        | "partially_refunded"
+        | "under_review"
+        | "not_reconciled"
       platform_assignment_status: "active" | "revoked"
       platform_role: "platform_admin" | "platform_support"
       profile_status: "active" | "inactive" | "under_review" | "disabled"
@@ -1700,8 +2061,49 @@ export const Constants = {
     Enums: {},
   },
   public: {
+    Enums: {},
+  },
+  resident: {
     Enums: {
+      adjustment_category: [
+        "discount",
+        "interest",
+        "fine",
+        "credit",
+        "debit",
+        "correction",
+        "other",
+      ],
+      billing_account_status: ["active", "inactive", "suspended", "closed"],
+      billing_cycle_status: ["draft", "open", "closed", "cancelled"],
       contact_type: ["email", "phone", "whatsapp"],
+      financial_event_type: [
+        "invoice_created",
+        "invoice_issued",
+        "invoice_sent",
+        "invoice_cancelled",
+        "invoice_replaced",
+        "invoice_renegotiated",
+        "invoice_written_off",
+        "reminder_sent",
+        "payment_started",
+        "payment_processing",
+        "payment_confirmed",
+        "payment_failed",
+        "payment_refunded",
+        "payment_partially_refunded",
+        "webhook_received",
+        "adjustment_applied",
+        "discount_applied",
+        "interest_applied",
+        "fine_applied",
+        "credit_applied",
+        "receipt_generated",
+        "status_updated",
+        "manual_settlement",
+        "billing_cycle_opened",
+        "billing_cycle_closed",
+      ],
       household_member_status: ["active", "inactive", "former"],
       household_relationship: [
         "spouse",
@@ -1711,6 +2113,48 @@ export const Constants = {
         "dependent",
         "legal_charge",
         "other",
+      ],
+      invoice_item_category: [
+        "water",
+        "association_fee",
+        "maintenance",
+        "reserve_fund",
+        "penalty",
+        "adjustment",
+        "donation",
+        "other_services",
+      ],
+      invoice_status: [
+        "draft",
+        "issued",
+        "open",
+        "payment_pending",
+        "paid",
+        "overdue",
+        "cancelled",
+        "replaced",
+        "renegotiated",
+        "written_off",
+      ],
+      payment_method_type: [
+        "pix",
+        "boleto",
+        "credit_card",
+        "debit_card",
+        "bank_transfer",
+        "cash",
+        "manual",
+        "other",
+      ],
+      payment_status: [
+        "pending",
+        "processing",
+        "confirmed",
+        "failed",
+        "refunded",
+        "partially_refunded",
+        "under_review",
+        "not_reconciled",
       ],
       platform_assignment_status: ["active", "revoked"],
       platform_role: ["platform_admin", "platform_support"],

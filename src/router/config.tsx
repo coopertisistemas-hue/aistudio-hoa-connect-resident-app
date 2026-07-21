@@ -43,6 +43,15 @@ const NotificacoesPage = lazy(() => import("@/pages/notificacoes/page"));
 const NotificationDetailPage = lazy(() => import("@/pages/notificacoes/NotificationDetailPage"));
 const PreferenciasPage = lazy(() => import("@/pages/notificacoes/PreferenciasPage"));
 const AtividadePage = lazy(() => import("@/pages/atividade/page"));
+// Admin Finance Pages (EPF-01)
+const AdminFinancePage = lazy(() => import("@/pages/admin/finance/page"));
+const AdminBillingCyclesPage = lazy(() => import("@/pages/admin/finance/BillingCyclesPage"));
+const AdminInvoicesPage = lazy(() => import("@/pages/admin/finance/InvoicesPage"));
+const AdminInvoiceDetailPage = lazy(() => import("@/pages/admin/finance/InvoiceDetailPage"));
+const AdminPaymentsPage = lazy(() => import("@/pages/admin/finance/PaymentsPage"));
+const AdminPaymentDetailPage = lazy(() => import("@/pages/admin/finance/PaymentDetailPage"));
+const AdminReportsPage = lazy(() => import("@/pages/admin/finance/ReportsPage"));
+const AdminAuditLogPage = lazy(() => import("@/pages/admin/finance/AuditLogPage"));
 
 const loadingFallback = <div className="flex items-center justify-center min-h-screen bg-background-50"><LoadingState /></div>;
 
@@ -88,6 +97,15 @@ const routes: RouteObject[] = [
   { path: "/notificacoes/preferencias", element: <Suspense fallback={loadingFallback}><PreferenciasPage /></Suspense> },
   { path: "/notificacoes/:notificationId", element: <Suspense fallback={loadingFallback}><NotificationDetailPage /></Suspense> },
   { path: "/atividade", element: <Suspense fallback={loadingFallback}><AtividadePage /></Suspense> },
+  // Admin Finance Routes (EPF-01 — role-protected)
+  { path: "/admin/finance", element: <Suspense fallback={loadingFallback}><AdminFinancePage /></Suspense> },
+  { path: "/admin/finance/ciclos", element: <Suspense fallback={loadingFallback}><AdminBillingCyclesPage /></Suspense> },
+  { path: "/admin/finance/faturas", element: <Suspense fallback={loadingFallback}><AdminInvoicesPage /></Suspense> },
+  { path: "/admin/finance/faturas/:invoiceId", element: <Suspense fallback={loadingFallback}><AdminInvoiceDetailPage /></Suspense> },
+  { path: "/admin/finance/pagamentos", element: <Suspense fallback={loadingFallback}><AdminPaymentsPage /></Suspense> },
+  { path: "/admin/finance/pagamentos/:paymentId", element: <Suspense fallback={loadingFallback}><AdminPaymentDetailPage /></Suspense> },
+  { path: "/admin/finance/relatorios", element: <Suspense fallback={loadingFallback}><AdminReportsPage /></Suspense> },
+  { path: "/admin/finance/auditoria", element: <Suspense fallback={loadingFallback}><AdminAuditLogPage /></Suspense> },
   { path: "*", element: <Suspense fallback={loadingFallback}><NotFound /></Suspense> },
 ];
 
