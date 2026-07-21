@@ -2,7 +2,7 @@
 
 **Wave:** 2.3
 **Topic:** Residence & Household Domain Foundation
-**Status:** CONDITIONS REMEDIATED — PENDING FINAL INDEPENDENT CLOSEOUT
+**Status:** HOTFIX DEPLOYED — PENDING FINAL CODEX CLOSEOUT
 **Date:** 2026-07-20
 
 ---
@@ -380,7 +380,7 @@ Direct privileged inspection of live production project `xcuxcqbctfjgccsdqwgl` w
   - `trg_residence_members_no_household_dup` attached `BEFORE INSERT OR UPDATE` on `resident.residence_members`.
   - Bidirectional enforcement active.
 - **RLS & Grants Posture:**
-  - RLS enabled on all 16 tables in `resident` schema.
+  - RLS enabled on all 15 tables in `resident` schema.
   - `GRANT USAGE ON SCHEMA resident TO authenticated;` active (no usage grant to `anon`).
   - Core domain tables (`residents`, `residence_members`, `household_members`, `tenants`, `tenant_members`, `properties`, `association_details`, `association_settings_private`, `resident_staff_notes`) have ONLY `SELECT` grants for `authenticated`. No direct `INSERT`, `UPDATE`, or `DELETE` grants exist.
   - PostgREST exposure in `supabase/config.toml`: `api.schemas = ["public", "graphql_public", "resident"]`.
@@ -443,7 +443,7 @@ File-by-file audit of commit `b24ced93279f11d9debbc23cac929789d1d8b319`:
 12. `supabase/tests/sprint01_edge_function_fixtures.sql` — `ANCILLARY BUT JUSTIFIED` (Updates Edge Function test fixture SQL for `resident` schema).
 13. `supabase/tests/sprint01_foundation.sql` — `ANCILLARY BUT JUSTIFIED` (Updates foundation pgTAP tests for `resident` schema).
 14. `supabase/tests/sprint02_domain.sql` — `ANCILLARY BUT JUSTIFIED` (Updates domain pgTAP tests for `resident` schema).
-15. `validation/sprint01_edge_function_authorization.json` — `ANCILLARY BUT JUSTIFIED` (Updates Edge Function authorization evidence).
+15. `validation/evidence/sprint01_edge_function_authorization.json` — `ANCILLARY BUT JUSTIFIED` (Updates Edge Function authorization evidence).
 
 Zero unrelated files or Wave 2.4 functionality were introduced.
 
@@ -453,6 +453,10 @@ Only informational / future-wave design findings remain open (R-01 through R-04 
 
 ### 13.7 Final Closeout Candidate Status
 
+### 13.8 Wave 2.3.1 Hotfix Record
+
+Wave 2.3.1 corrected the production SPA deep-route fallback and two publication-evidence inaccuracies. No Wave 2.3 database behavior or business capability was changed.
+
 ```text
-WAVE 2.3 CONDITIONS REMEDIATED — PENDING FINAL INDEPENDENT CLOSEOUT
+WAVE 2.3.1 HOTFIX DEPLOYED — PENDING FINAL CODEX CLOSEOUT
 ```
