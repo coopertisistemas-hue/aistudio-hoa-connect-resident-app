@@ -1,0 +1,460 @@
+import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2.57.4';
+import { buildCorsHeaders } from '../_shared/http.ts';
+
+interface RequestContext {
+  requestId: string;
+  authClient: SupabaseClient;
+  adminClient: SupabaseClient;
+  headers: Record<string, string>;
+}
+
+interface BillingExecuteInput {
+  billingCycleId: string;
+  preview?: boolean;
+}
+
+interface BillingResult {
+  success: boolean;
+  billingCycleId: string;
+  invoicesGenerated: number;
+  totalAmount: number;
+  invoiceIds: string[];
+  previewItems: PreviewItem[];
+  errors: ErrorRecord[];
+}
+
+interface PreviewItem {
+  meterId: string;
+  meterNumber: string;
+  consumption: number;
+  tariffResult: Record<string, unknown>;
+}
+
+interface ErrorRecord {
+  meterId: string;
+  meterNumber: string;
+  error: string;
+}
+
+async function buildRequestContext(request: Request): Promise<RequestContext | Response> {
+  const requestId = request.headers.get('x-request-id') || crypto.randomUUID();
+  const headers = buildCorsHeaders('*');
+
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+  const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+  const authClient = createClient(supabaseUrl, supabaseAnonKey, {
+    global: { headers: { Authorization: request.headers.get('Authorization')! } },
+    db: { schema: 'resident' },
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+
+  const adminClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
+    db: { schema: 'resident' },
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+
+  const { data: user, error: userError } = await authClient.auth.getUser();
+
+  if (userError || !user) {
+    return new Response(
+      JSON.stringify({
+        data: null,
+        error: { code: 'UNAUTHENTICATED', message: 'Autenticacao necessaria', requestId },
+        meta: { requestId, generatedAt: new Date().toISOString() },
+      }),
+      { status: 401, headers: { ...headers, 'Content-Type': 'application/json' } },
+    );
+  }
+
+  return { requestId, authClient, adminClient, headers };
+}
+
+async function processBilling(
+  input: BillingExecuteInput,
+  ctx: RequestContext,
+): Promise<BillingResult> {
+  const preview = input.preview === true;
+  const result: BillingResult = {
+    success: true,
+    billingCycleId: input.billingCycleId,
+    invoicesGenerated: 0,
+    totalAmount: 0,
+    invoiceIds: [],
+    previewItems: [],
+    errors: [],
+  };
+
+  // 1. Get the billing cycle
+  const { data: cycle, error: cycleError } = await ctx.authClient
+    .from('billing_cycles')
+    .select('*')
+    .eq('id', input.billingCycleId)
+    .single();
+
+  if (cycleError || !cycle) {
+    result.success = false;
+    result.errors.push({
+      meterId: 'n/a',
+      meterNumber: 'n/a',
+      error: `Billing cycle not found: ${input.billingCycleId}`,
+    });
+    return result;
+  }
+
+  const billingAccountId = cycle.billing_account_id;
+  const tenantId = cycle.tenant_id;
+  const cycleStart = cycle.cycle_start;
+  const cycleEnd = cycle.cycle_end;
+
+  // 2. Get the billing account to find the property
+  const { data: billingAccount, error: baError } = await ctx.adminClient
+    .from('billing_accounts')
+    .select('property_id')
+    .eq('id', billingAccountId)
+    .single();
+
+  if (baError || !billingAccount) {
+    result.success = false;
+    result.errors.push({
+      meterId: 'n/a',
+      meterNumber: 'n/a',
+      error: `Billing account not found: ${billingAccountId}`,
+    });
+    return result;
+  }
+
+  const propertyId = billingAccount.property_id;
+
+  // 3. Find active water meters for the property
+  const { data: meters, error: metersError } = await ctx.authClient
+    .from('water_meters')
+    .select('*')
+    .eq('property_id', propertyId)
+    .eq('status', 'active')
+    .is('deleted_at', null);
+
+  if (metersError || !meters || meters.length === 0) {
+    result.success = false;
+    result.errors.push({
+      meterId: 'n/a',
+      meterNumber: 'n/a',
+      error: `No active water meters found for property ${propertyId}`,
+    });
+    return result;
+  }
+
+  // 4. Find active tariff table for the tenant
+  const { data: tariffTable, error: tariffError } = await ctx.authClient
+    .from('tariff_tables')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .eq('is_active', true)
+    .is('deleted_at', null)
+    .order('effective_from', { ascending: false })
+    .limit(1)
+    .single();
+
+  if (tariffError || !tariffTable) {
+    result.success = false;
+    result.errors.push({
+      meterId: 'n/a',
+      meterNumber: 'n/a',
+      error: 'No active tariff table found for this tenant',
+    });
+    return result;
+  }
+
+  // 5. Process each meter
+  for (const meter of meters) {
+    try {
+      await processMeter(
+        meter, cycle, billingAccountId, tenantId, tariffTable.id,
+        preview, ctx, result,
+      );
+    } catch (err) {
+      result.errors.push({
+        meterId: meter.id,
+        meterNumber: meter.meter_number,
+        error: err instanceof Error ? err.message : 'Unknown error during billing',
+      });
+    }
+  }
+
+  return result;
+}
+
+async function processMeter(
+  meter: Record<string, unknown>,
+  cycle: Record<string, unknown>,
+  billingAccountId: string,
+  tenantId: string,
+  tariffTableId: string,
+  preview: boolean,
+  ctx: RequestContext,
+  result: BillingResult,
+): Promise<void> {
+  const meterId = meter.id as string;
+  const meterNumber = (meter.meter_number as string) || meterId;
+
+  // 5a. Calculate consumption
+  const { data: consumption, error: consError } = await ctx.authClient.rpc(
+    'calculate_consumption',
+    {
+      p_meter_id: meterId,
+      p_from_date: cycle.cycle_start as string,
+      p_to_date: cycle.cycle_end as string,
+    },
+  );
+
+  if (consError) {
+    throw new Error(`Consumption calculation error: ${consError.message}`);
+  }
+
+  if (consumption === null || consumption < 0) {
+    result.errors.push({
+      meterId,
+      meterNumber,
+      error: `Insufficient readings for consumption calculation`,
+    });
+    return;
+  }
+
+  if (consumption === 0) {
+    result.errors.push({
+      meterId,
+      meterNumber,
+      error: `Zero consumption (no change in readings)`,
+    });
+    return;
+  }
+
+  // 5b. Apply tariff
+  const { data: tariffResult, error: tariffErr } = await ctx.authClient.rpc(
+    'apply_tariff',
+    {
+      p_consumption: consumption,
+      p_tariff_table_id: tariffTableId,
+    },
+  );
+
+  if (tariffErr) {
+    throw new Error(`Tariff application error: ${tariffErr.message}`);
+  }
+
+  const tariffData = tariffResult as Record<string, unknown>;
+
+  // 5c. Build preview item
+  result.previewItems.push({
+    meterId,
+    meterNumber,
+    consumption: consumption as number,
+    tariffResult: tariffData,
+  });
+
+  if (preview) {
+    // Preview only — do not persist
+    return;
+  }
+
+  // 5d. Generate invoice (execution mode — persist to EPF-01)
+  const documentNumber = `AGUA-${(cycle.reference_period as string)?.replace('/', '-')}-${meterNumber}`;
+  const invoiceAmount = tariffData.total_amount as number;
+
+  const { data: invoice, error: invoiceError } = await ctx.adminClient
+    .from('invoices')
+    .insert({
+      tenant_id: tenantId,
+      billing_account_id: billingAccountId,
+      billing_cycle_id: cycle.id,
+      document_number: documentNumber,
+      amount: invoiceAmount,
+      due_date: cycle.due_date,
+      status: 'issued',
+      issued_at: new Date().toISOString(),
+      metadata: {
+        source: 'water_billing',
+        meter_id: meterId,
+        meter_number: meterNumber,
+        consumption,
+        cycle_reference: cycle.reference_period,
+      },
+    })
+    .select('id')
+    .single();
+
+  if (invoiceError) {
+    throw new Error(`Invoice creation error: ${invoiceError.message}`);
+  }
+
+  result.invoiceIds.push(invoice.id);
+  result.invoicesGenerated++;
+  result.totalAmount += invoiceAmount;
+
+  // 5e. Create invoice item
+  const bandDescriptions = (tariffData.bands as Array<Record<string, unknown>> || [])
+    .map((b: Record<string, unknown>) =>
+      `${b.consumption} m³ × R$ ${b.unit_price}/m³ = R$ ${b.charge}`
+    )
+    .join('; ');
+
+  await ctx.adminClient.from('invoice_items').insert({
+    tenant_id: tenantId,
+    invoice_id: invoice.id,
+    description: `Consumo de Água — Hidrômetro ${meterNumber} — ${consumption} m³ (${bandDescriptions})`,
+    category: 'water',
+    quantity: consumption as number,
+    unit_price: tariffData.total_amount ? (tariffData.total_amount as number) / (consumption as number) : 0,
+    amount: invoiceAmount,
+    sort_order: 1,
+    metadata: {
+      meter_id: meterId,
+      meter_number: meterNumber,
+      tariff_table_id: tariffTableId,
+      tariff_type: tariffData.tariff_type,
+      bands: tariffData.bands,
+    },
+  });
+
+  // 5f. Create ledger entry
+  const previousBalance = await getPreviousBalance(tenantId, ctx);
+  const newBalance = previousBalance + invoiceAmount;
+
+  await ctx.adminClient.from('ledger_entries').insert({
+    tenant_id: tenantId,
+    entry_date: new Date().toISOString(),
+    description: `Fatura de água — ${documentNumber} — ${meterNumber} — ${cycle.reference_period}`,
+    debit_amount: invoiceAmount,
+    credit_amount: 0,
+    balance: newBalance,
+    entity_type: 'water_billing',
+    entity_id: invoice.id,
+    reference_document: documentNumber,
+    metadata: {
+      invoice_id: invoice.id,
+      billing_cycle_id: cycle.id,
+      meter_id: meterId,
+      meter_number: meterNumber,
+      consumption,
+    },
+  });
+
+  // 5g. Log financial audit
+  await ctx.adminClient.rpc('log_financial_audit', {
+    p_tenant_id: tenantId,
+    p_action: 'invoice_created',
+    p_entity_type: 'water_billing',
+    p_entity_id: invoice.id,
+    p_changes: {
+      invoice_id: invoice.id,
+      document_number: documentNumber,
+      amount: invoiceAmount,
+      meter_id: meterId,
+      meter_number: meterNumber,
+      consumption,
+      tariff_result: tariffData,
+    },
+    p_metadata: {
+      source: 'water_billing_edge_function',
+      billing_cycle_id: cycle.id,
+      reference_period: cycle.reference_period,
+    },
+  });
+}
+
+async function getPreviousBalance(tenantId: string, ctx: RequestContext): Promise<number> {
+  const { data, error } = await ctx.adminClient
+    .from('ledger_entries')
+    .select('balance')
+    .eq('tenant_id', tenantId)
+    .order('entry_date', { ascending: false })
+    .limit(1)
+    .single();
+
+  if (error || !data) return 0;
+  return data.balance as number;
+}
+
+// ============================================================================
+// Main Entry Point
+// ============================================================================
+
+Deno.serve(async (request: Request) => {
+  if (request.method === 'OPTIONS') {
+    const headers = buildCorsHeaders('*');
+    return new Response(null, { status: 204, headers });
+  }
+
+  if (request.method !== 'POST') {
+    const headers = buildCorsHeaders('*');
+    return new Response(
+      JSON.stringify({
+        data: null,
+        error: { code: 'VALIDATION_ERROR', message: 'Method not allowed. Use POST.', requestId: 'n/a' },
+        meta: { requestId: 'n/a', generatedAt: new Date().toISOString() },
+      }),
+      { status: 405, headers: { ...headers, 'Content-Type': 'application/json' } },
+    );
+  }
+
+  const ctx = await buildRequestContext(request);
+  if (ctx instanceof Response) return ctx;
+
+  let body: Record<string, unknown>;
+  try {
+    body = await request.json();
+  } catch {
+    return new Response(
+      JSON.stringify({
+        data: null,
+        error: { code: 'VALIDATION_ERROR', message: 'Invalid JSON body', requestId: ctx.requestId },
+        meta: { requestId: ctx.requestId, generatedAt: new Date().toISOString() },
+      }),
+      { status: 422, headers: { ...ctx.headers, 'Content-Type': 'application/json' } },
+    );
+  }
+
+  const billingCycleId = body.billingCycleId as string;
+  const preview = body.preview === true;
+
+  if (!billingCycleId) {
+    return new Response(
+      JSON.stringify({
+        data: null,
+        error: { code: 'VALIDATION_ERROR', message: 'billingCycleId is required', requestId: ctx.requestId },
+        meta: { requestId: ctx.requestId, generatedAt: new Date().toISOString() },
+      }),
+      { status: 422, headers: { ...ctx.headers, 'Content-Type': 'application/json' } },
+    );
+  }
+
+  try {
+    const result = await processBilling({ billingCycleId, preview }, ctx);
+
+    return new Response(
+      JSON.stringify({
+        data: result,
+        error: null,
+        meta: { requestId: ctx.requestId, generatedAt: new Date().toISOString() },
+      }),
+      {
+        status: 200,
+        headers: { ...ctx.headers, 'Content-Type': 'application/json' },
+      },
+    );
+  } catch (err) {
+    return new Response(
+      JSON.stringify({
+        data: null,
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: err instanceof Error ? err.message : 'Internal billing error',
+          requestId: ctx.requestId,
+        },
+        meta: { requestId: ctx.requestId, generatedAt: new Date().toISOString() },
+      }),
+      { status: 500, headers: { ...ctx.headers, 'Content-Type': 'application/json' } },
+    );
+  }
+});

@@ -52,6 +52,15 @@ const AdminPaymentsPage = lazy(() => import("@/pages/admin/finance/PaymentsPage"
 const AdminPaymentDetailPage = lazy(() => import("@/pages/admin/finance/PaymentDetailPage"));
 const AdminReportsPage = lazy(() => import("@/pages/admin/finance/ReportsPage"));
 const AdminAuditLogPage = lazy(() => import("@/pages/admin/finance/AuditLogPage"));
+// Admin Water Pages (EPF-02)
+const AdminWaterPage = lazy(() => import("@/pages/admin/water/page"));
+const AdminWaterMetersPage = lazy(() => import("@/pages/admin/water/MetersPage"));
+const AdminWaterMeterDetailPage = lazy(() => import("@/pages/admin/water/MeterDetailPage"));
+const AdminWaterReadingsPage = lazy(() => import("@/pages/admin/water/ReadingsPage"));
+const AdminWaterTariffsPage = lazy(() => import("@/pages/admin/water/TariffsPage"));
+const AdminWaterBillingCyclesPage = lazy(() => import("@/pages/admin/water/BillingCyclesPage"));
+const AdminWaterBillingProcessPage = lazy(() => import("@/pages/admin/water/BillingProcessPage"));
+const AdminWaterConsumptionPage = lazy(() => import("@/pages/admin/water/ConsumptionPage"));
 
 const loadingFallback = <div className="flex items-center justify-center min-h-screen bg-background-50"><LoadingState /></div>;
 
@@ -106,6 +115,15 @@ const routes: RouteObject[] = [
   { path: "/admin/finance/pagamentos/:paymentId", element: <Suspense fallback={loadingFallback}><AdminPaymentDetailPage /></Suspense> },
   { path: "/admin/finance/relatorios", element: <Suspense fallback={loadingFallback}><AdminReportsPage /></Suspense> },
   { path: "/admin/finance/auditoria", element: <Suspense fallback={loadingFallback}><AdminAuditLogPage /></Suspense> },
+  // Admin Water Routes (EPF-02 — Water Billing Domain)
+  { path: "/admin/agua", element: <Suspense fallback={loadingFallback}><AdminWaterPage /></Suspense> },
+  { path: "/admin/agua/hidrometros", element: <Suspense fallback={loadingFallback}><AdminWaterMetersPage /></Suspense> },
+  { path: "/admin/agua/hidrometros/:meterId", element: <Suspense fallback={loadingFallback}><AdminWaterMeterDetailPage /></Suspense> },
+  { path: "/admin/agua/leituras", element: <Suspense fallback={loadingFallback}><AdminWaterReadingsPage /></Suspense> },
+  { path: "/admin/agua/tarifas", element: <Suspense fallback={loadingFallback}><AdminWaterTariffsPage /></Suspense> },
+  { path: "/admin/agua/ciclos", element: <Suspense fallback={loadingFallback}><AdminWaterBillingCyclesPage /></Suspense> },
+  { path: "/admin/agua/faturamento", element: <Suspense fallback={loadingFallback}><AdminWaterBillingProcessPage /></Suspense> },
+  { path: "/admin/agua/consumo", element: <Suspense fallback={loadingFallback}><AdminWaterConsumptionPage /></Suspense> },
   { path: "*", element: <Suspense fallback={loadingFallback}><NotFound /></Suspense> },
 ];
 
