@@ -258,122 +258,45 @@ async function processMeter(
     return;
   }
 
-  // 5d. Generate invoice (execution mode — persist to EPF-01)
+  // 5d. Atomic billing execution (all writes in single DB transaction)
   const documentNumber = `AGUA-${(cycle.reference_period as string)?.replace('/', '-')}-${meterNumber}`;
   const invoiceAmount = tariffData.total_amount as number;
 
-  const { data: invoice, error: invoiceError } = await ctx.adminClient
-    .from('invoices')
-    .insert({
-      tenant_id: tenantId,
-      billing_account_id: billingAccountId,
-      billing_cycle_id: cycle.id,
-      document_number: documentNumber,
-      amount: invoiceAmount,
-      due_date: cycle.due_date,
-      status: 'issued',
-      issued_at: new Date().toISOString(),
-      metadata: {
-        source: 'water_billing',
-        meter_id: meterId,
-        meter_number: meterNumber,
-        consumption,
-        cycle_reference: cycle.reference_period,
-      },
-    })
-    .select('id')
-    .single();
+  const { data: billingResult, error: billingError } = await ctx.adminClient.rpc(
+    'process_water_billing',
+    {
+      p_tenant_id: tenantId,
+      p_billing_account_id: billingAccountId,
+      p_billing_cycle_id: cycle.id,
+      p_document_number: documentNumber,
+      p_amount: invoiceAmount,
+      p_due_date: cycle.due_date,
+      p_reference_period: cycle.reference_period,
+      p_meter_id: meterId,
+      p_meter_number: meterNumber,
+      p_consumption: consumption,
+      p_tariff_result: tariffData,
+    },
+  );
 
-  if (invoiceError) {
-    throw new Error(`Invoice creation error: ${invoiceError.message}`);
+  if (billingError) {
+    throw new Error(`Billing execution error: ${billingError.message}`);
   }
 
-  result.invoiceIds.push(invoice.id);
+  const billingData = billingResult as Record<string, unknown>;
+
+  if (billingData.status === 'duplicate') {
+    result.errors.push({
+      meterId,
+      meterNumber,
+      error: `Duplicate invoice — already processed: ${billingData.invoice_id}`,
+    });
+    return;
+  }
+
+  result.invoiceIds.push(billingData.invoice_id as string);
   result.invoicesGenerated++;
   result.totalAmount += invoiceAmount;
-
-  // 5e. Create invoice item
-  const bandDescriptions = (tariffData.bands as Array<Record<string, unknown>> || [])
-    .map((b: Record<string, unknown>) =>
-      `${b.consumption} m³ × R$ ${b.unit_price}/m³ = R$ ${b.charge}`
-    )
-    .join('; ');
-
-  await ctx.adminClient.from('invoice_items').insert({
-    tenant_id: tenantId,
-    invoice_id: invoice.id,
-    description: `Consumo de Água — Hidrômetro ${meterNumber} — ${consumption} m³ (${bandDescriptions})`,
-    category: 'water',
-    quantity: consumption as number,
-    unit_price: tariffData.total_amount ? (tariffData.total_amount as number) / (consumption as number) : 0,
-    amount: invoiceAmount,
-    sort_order: 1,
-    metadata: {
-      meter_id: meterId,
-      meter_number: meterNumber,
-      tariff_table_id: tariffTableId,
-      tariff_type: tariffData.tariff_type,
-      bands: tariffData.bands,
-    },
-  });
-
-  // 5f. Create ledger entry
-  const previousBalance = await getPreviousBalance(tenantId, ctx);
-  const newBalance = previousBalance + invoiceAmount;
-
-  await ctx.adminClient.from('ledger_entries').insert({
-    tenant_id: tenantId,
-    entry_date: new Date().toISOString(),
-    description: `Fatura de água — ${documentNumber} — ${meterNumber} — ${cycle.reference_period}`,
-    debit_amount: invoiceAmount,
-    credit_amount: 0,
-    balance: newBalance,
-    entity_type: 'water_billing',
-    entity_id: invoice.id,
-    reference_document: documentNumber,
-    metadata: {
-      invoice_id: invoice.id,
-      billing_cycle_id: cycle.id,
-      meter_id: meterId,
-      meter_number: meterNumber,
-      consumption,
-    },
-  });
-
-  // 5g. Log financial audit
-  await ctx.adminClient.rpc('log_financial_audit', {
-    p_tenant_id: tenantId,
-    p_action: 'invoice_created',
-    p_entity_type: 'water_billing',
-    p_entity_id: invoice.id,
-    p_changes: {
-      invoice_id: invoice.id,
-      document_number: documentNumber,
-      amount: invoiceAmount,
-      meter_id: meterId,
-      meter_number: meterNumber,
-      consumption,
-      tariff_result: tariffData,
-    },
-    p_metadata: {
-      source: 'water_billing_edge_function',
-      billing_cycle_id: cycle.id,
-      reference_period: cycle.reference_period,
-    },
-  });
-}
-
-async function getPreviousBalance(tenantId: string, ctx: RequestContext): Promise<number> {
-  const { data, error } = await ctx.adminClient
-    .from('ledger_entries')
-    .select('balance')
-    .eq('tenant_id', tenantId)
-    .order('entry_date', { ascending: false })
-    .limit(1)
-    .single();
-
-  if (error || !data) return 0;
-  return data.balance as number;
 }
 
 // ============================================================================

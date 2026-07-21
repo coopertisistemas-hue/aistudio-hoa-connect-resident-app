@@ -35,7 +35,7 @@ The Water Billing Domain (EPF-02) has been implemented on top of the certified E
 | Helper Functions | 2 | `calculate_consumption`, `apply_tariff` |
 | Trigger Functions | 2 | `set_initial_meter_reading`, `validate_reading_monotonic` |
 | Triggers | 6 | updated_at (4), initial reading (1), reading validation (1) |
-| RLS Policies | 16 | Three-tier SELECT-only (matching EPF-01 pattern) |
+| RLS Policies | 15 | Three-tier SELECT-only (matching EPF-01 pattern) |
 | Indexes | 7 | Optimized for common query patterns |
 
 ### 3.2 Database — Tables Detail
@@ -191,7 +191,7 @@ Readings → Consumption → Tariff → Preview → Validation → Execute → I
 | Check | Method | Status |
 |---|---|---|
 | Database migration | `supabase db reset` | All 7 migrations applied |
-| RLS policies | SQL validation suite (25 tests) | 16 policies on 6 tables |
+| RLS policies | SQL validation suite (25 tests) | 15 policies on 6 tables |
 | TypeScript | `tsc --noEmit --project tsconfig.app.json` | |
 | Build | `vite build` | |
 | EPF-01 regression | `supabase:test:sprint1` + `supabase:test:sprint2` | No changes to EPF-01 schema |
