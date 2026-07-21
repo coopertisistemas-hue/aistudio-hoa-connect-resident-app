@@ -22,11 +22,11 @@ The Residence Core provides:
 
 ```
 Schema: resident
-Tables: 15
-Enums: 16
-Helper Functions: 29
-Triggers: 26
-RLS Policies: 39
+Tables: 15 (Residence Core)
+Enums: 16 (Residence Core)
+Helper Functions: 29 (Residence Core)
+Triggers: 26 (Residence Core)
+RLS Policies: 39 (Residence Core)
 ```
 
 ### Domain Hierarchy
@@ -166,12 +166,11 @@ Vite 8 SPA + React Router v7
 
 | Property | Value |
 |----------|-------|
-| Commit | `e7c6d13107d6e35d2bc5de5b2f31009177980695` |
 | Tag | `residence-core-v1.0.0-certified` |
 | Git tree | Clean |
 | Migrations | 5 files, all applied |
 | Edge Functions | 12 functions, all deployed |
-| RLS | 100% coverage across all 15 tables (39 policies) |
+| RLS | 100% coverage across all 15 Residence Core tables (39 policies) |
 | TypeScript | Build passing |
 | Lint | 2 errors, 4 warnings (pre-existing baseline) |
 | Tests | Sprint 1 + Sprint 2 suites passing |

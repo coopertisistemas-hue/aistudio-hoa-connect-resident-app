@@ -7,9 +7,6 @@
 > **DAP-01 Note**: This document has been further updated by DAP-01 (Documentation Alignment Patch)
 > to correct all architectural metrics and repository metadata to match the verified repository state.
 >
-> **CDH-01 Note**: This document has been further updated by CDH-01 (Certification Documentation Hotfix)
-> to synchronize all git references, HEAD commit, and Ahead/Behind status to the verified live
-> repository state. No executable code or database objects were modified.
 
 ## Executive Summary
 
@@ -33,10 +30,8 @@ No Edge Functions, payment processing, or data flows are wired for production.
 |----------|-------|
 | Repository | https://github.com/coopertisistemas-hue/aistudio-hoa-connect-resident-app.git |
 | Branch | `sprint-01-foundation-identity` |
-| HEAD Commit | `CDH-01` — Certification Documentation Hotfix |
-| Certified Tag | `residence-core-v1.0.0-certified` (commit `e7c6d13`) |
+| Certified Tag | `residence-core-v1.0.0-certified` |
 | Working Tree | Clean |
-| Ahead/Behind | 0 commits ahead of origin / 0 behind |
 
 ---
 
@@ -52,7 +47,7 @@ No Edge Functions, payment processing, or data flows are wired for production.
 
 ## Created Entities
 
-### Database — 12 Tables (Infrastructure — Runtime Integration Deferred)
+### Database — 12 Financial Tables (EPF-01 Financial Domain — Infrastructure — Runtime Integration Deferred)
 
 | # | Table | Purpose | Soft-Delete | Immutable |
 |---|-------|---------|-------------|-----------|
@@ -73,7 +68,7 @@ No Edge Functions, payment processing, or data flows are wired for production.
 No business logic populates ledger entries at runtime. The schema is correct and immutable
 triggers are active. Ledger entries will be written when Edge Functions are implemented.
 
-### Database — 8 Enums
+### Database — 8 Financial Enums (EPF-01 Financial Domain)
 
 | Enum | Values |
 |------|--------|
@@ -86,7 +81,7 @@ triggers are active. Ledger entries will be written when Edge Functions are impl
 | `billing_cycle_status` | `draft`, `open`, `closed`, `cancelled` |
 | `invoice_item_category` | `water`, `association_fee`, `maintenance`, `reserve_fund`, `penalty`, `adjustment`, `donation`, `other_services` |
 
-### Database — 2 Helper Functions
+### Database — 2 Helper Functions (EPF-01 Financial Domain)
 
 | Function | Purpose |
 |----------|---------| 
@@ -191,6 +186,7 @@ scaffold prevents accidental access while ensuring no future routing refactor is
 | `financial_audit_log` | enabled | forced | `audit:read_association` + platform_admin |
 
 All 12 tables: RLS enabled, Force RLS enabled, SELECT policies defined.
+Total: 32 RLS policies (EPF-01 Financial Domain).
 
 Mutation operations are reserved for Edge Functions (following existing `SELECT-only` grant pattern).
 
@@ -372,6 +368,5 @@ Certification authority remains exclusively with the independent Codex audit.
 
 *EPF-01R — Financial Domain Foundation Remediation — Remediation Complete*
 *DAP-01 — Documentation Alignment Patch — Applied 2026-07-21*
-*CDH-01 — Certification Documentation Hotfix — Applied 2026-07-21*
 *Date: 2026-07-21*
 *Next Step: Final Independent Technical Certification*

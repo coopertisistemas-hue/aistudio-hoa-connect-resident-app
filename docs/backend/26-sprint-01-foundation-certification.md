@@ -5,7 +5,6 @@
 > Certifier: agy (Claude Opus 4.6, Thinking), executing as governance gate
 > Executed: July 19, 2026
 > Branch: `sprint-01-foundation-identity`
-> HEAD: `fe62d5f`
 
 ---
 
@@ -93,7 +92,7 @@ The three conditions closed before the hardening wave were:
 
 Report 21 confirms: "All original three Sprint 1 conditions (edge auth, package/typecheck, performance) are **CLOSED**."
 
-Reports 17–22 have zero diff across the entire `d8adf20..fe62d5f` range. The historical audit trail is intact.
+Reports 17–22 are unchanged from their committed state. The historical audit trail is intact.
 
 ---
 
@@ -202,7 +201,7 @@ This observation is informational and improves clarity for future readers. It do
 | Execution-order independence | ✅ PASS | Phase 2: structural fingerprint + behavioral matrix |
 | COND-OPS-01 closure | ✅ CLOSED | §4 above: structural, behavioral, mechanical proof |
 | Clean repository state | ✅ CLEAN | `git status`: nothing to commit, working tree clean |
-| Historical audit trail (17–22) | ✅ INTACT | Zero diff across `d8adf20..fe62d5f` |
+| Historical audit trail (17–22) | ✅ INTACT | Zero diff — audit trail documents preserved |
 
 **All 16 gates: PASS.**
 
@@ -247,7 +246,6 @@ The hardening wave (Option B: `d2_`-prefixed validation objects in `public`) eli
 ║    Certified: July 19, 2026                              ║
 ║    Certifier: agy (Claude Opus 4.6, Thinking)            ║
 ║    Branch: sprint-01-foundation-identity                 ║
-║    HEAD: fe62d5f                                         ║
 ║    Open findings: LOW 4, OBSERVATION 2 (non-blocking)    ║
 ║    Carry-forwards: 4 items to Sprint 2                   ║
 ║                                                          ║
