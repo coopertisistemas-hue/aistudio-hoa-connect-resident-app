@@ -6,6 +6,10 @@
 >
 > **DAP-01 Note**: This document has been further updated by DAP-01 (Documentation Alignment Patch)
 > to correct all architectural metrics and repository metadata to match the verified repository state.
+>
+> **CDH-01 Note**: This document has been further updated by CDH-01 (Certification Documentation Hotfix)
+> to synchronize all git references, HEAD commit, and Ahead/Behind status to the verified live
+> repository state. No executable code or database objects were modified.
 
 ## Executive Summary
 
@@ -29,10 +33,10 @@ No Edge Functions, payment processing, or data flows are wired for production.
 |----------|-------|
 | Repository | https://github.com/coopertisistemas-hue/aistudio-hoa-connect-resident-app.git |
 | Branch | `sprint-01-foundation-identity` |
-| HEAD Commit | `ca344c2` (DAP-01 — Documentation Alignment Patch) |
+| HEAD Commit | `CDH-01` — Certification Documentation Hotfix |
 | Certified Tag | `residence-core-v1.0.0-certified` (commit `e7c6d13`) |
 | Working Tree | Clean |
-| Ahead/Behind | 3 commits ahead of origin / 0 behind |
+| Ahead/Behind | 0 commits ahead of origin / 0 behind |
 
 ---
 
@@ -368,5 +372,6 @@ Certification authority remains exclusively with the independent Codex audit.
 
 *EPF-01R — Financial Domain Foundation Remediation — Remediation Complete*
 *DAP-01 — Documentation Alignment Patch — Applied 2026-07-21*
+*CDH-01 — Certification Documentation Hotfix — Applied 2026-07-21*
 *Date: 2026-07-21*
-*Next Step: Independent Codex Re-Certification*
+*Next Step: Final Independent Technical Certification*

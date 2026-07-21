@@ -6,7 +6,7 @@ The **Residence Core** of HOA Connect has been officially certified and publishe
 
 The Residence Core provides:
 - Multi-tenant identity management with full namespace isolation (`resident` schema)
-- Role-Based Access Control (RBAC) with fine-grained permissions (19 permissions across 6 tenant roles)
+- Role-Based Access Control (RBAC) with fine-grained permissions (21 permissions across 6 tenant roles)
 - Row Level Security (RLS) on all tables via SECURITY DEFINER helper functions
 - Resident lifecycle management with state machine transitions
 - Residence membership history with EXCLUDE constraints for date-range integrity
@@ -22,11 +22,11 @@ The Residence Core provides:
 
 ```
 Schema: resident
-Tables: 14
-Enums: 17
-Helper Functions: 13 (all SECURITY DEFINER)
-Triggers: 16
-RLS Policies: 37
+Tables: 15
+Enums: 16
+Helper Functions: 29
+Triggers: 26
+RLS Policies: 39
 ```
 
 ### Domain Hierarchy
@@ -171,9 +171,9 @@ Vite 8 SPA + React Router v7
 | Git tree | Clean |
 | Migrations | 5 files, all applied |
 | Edge Functions | 12 functions, all deployed |
-| RLS | 100% coverage across all tables |
+| RLS | 100% coverage across all 15 tables (39 policies) |
 | TypeScript | Build passing |
-| Lint | Clean |
+| Lint | 2 errors, 4 warnings (pre-existing baseline) |
 | Tests | Sprint 1 + Sprint 2 suites passing |
 
 ---

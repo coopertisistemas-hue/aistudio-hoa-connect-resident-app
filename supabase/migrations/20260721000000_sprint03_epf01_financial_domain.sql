@@ -2,7 +2,7 @@
 -- Sprint 3 — Financial MVP for Associação de Moradores de Santa Terezinha
 --
 -- Implements the complete Financial Domain as a provider-agnostic foundation:
--- 12 tables, 5 enums, RLS, triggers, ledger-first architecture.
+-- 12 tables, 8 enums, RLS, triggers, ledger-first architecture.
 --
 -- CONSUMPTION, STRIPE, PIX GENERATION, BANK SLIP GENERATION, CNAB FILES,
 -- and PAYMENT PROCESSING are OUT OF SCOPE for this phase.
