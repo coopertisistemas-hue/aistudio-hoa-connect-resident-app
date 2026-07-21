@@ -251,5 +251,64 @@ All financial artifacts (invoices, items, ledger entries, audit log) are correct
 
 ---
 
-*Date: 2026-07-22*
-*Next Step: EPF-03 — Payment Processing*
+## 12. EPF-02R2 — Security and Ledger Correctness Patch
+
+> Date: 2026-07-24
+> Status: Certified-ready
+>
+> Closes independent certification findings C-1 through C-5.
+
+### 12.1 Findings Closed
+
+| Finding | Category | Root Cause | Fix |
+|---|---|---|---|
+| C-1 | Function security | `process_water_billing()` granted `EXECUTE` to `authenticated` | Revoked from `PUBLIC`, `anon`, and `authenticated`; granted only to `service_role` |
+| C-2 | Concurrency | Advisory lock keyed on `billing_cycle_id` protected only the cycle | Transaction-scoped tenant-level advisory lock protects the tenant ledger scope |
+| C-3 | Ledger semantics | Previous balance computed as `MAX(balance)` — the historical maximum | Latest entry ordering: `entry_date DESC, created_at DESC, id DESC LIMIT 1` |
+| C-4 | Audit attribution | `p_actor_profile_id` accepted but ignored; audit actor derived from `service_role auth.uid()` | Edge Function resolves actor profile from authenticated context and passes it; function persists it directly in `financial_audit_log` |
+| C-5 | Lock edge case | `abs(hashtext(...))` can overflow on `INT_MIN` | `pg_advisory_xact_lock(int4, int4)` with `hashtext()` keys — no `abs()` call |
+
+### 12.2 `process_water_billing()` — Runtime Contract
+
+- **Execution path**: `service_role` only. Direct RPC calls from `anon` or `authenticated` are rejected.
+- **Atomic boundary**: All four writes (`invoices`, `invoice_items`, `ledger_entries`, `financial_audit_log`) for a single meter are inside one PL/pgSQL function transaction. They succeed together or rollback together.
+- **Atomicity scope**: Per meter. The Edge Function invokes the function once per meter, so a failure for one meter rolls back only that meter. Other meters in the same billing cycle may still succeed — partial success across meters is intentional and supported.
+- **Rollback behavior**: Any error (FK violation, constraint failure, etc.) aborts the entire meter-level transaction. No partial invoice, ledger, or audit record survives.
+- **Idempotency**: Duplicate `document_number` for the same tenant returns `status: 'duplicate'` with the existing `invoice_id`. No duplicate invoice, ledger, or audit entries are created.
+- **Concurrency**: A transaction-scoped advisory lock keyed on the tenant serializes all billing executions for that tenant. Concurrent cycles for the same tenant cannot read the same prior ledger state.
+- **Ledger balance strategy**: The previous balance is the balance of the latest ledger entry for the tenant, ordered by `entry_date DESC, created_at DESC, id DESC`. The historical maximum balance is never used.
+- **Audit attribution**: The authenticated operator’s `profile_id` is resolved by the Edge Function and passed as `p_actor_profile_id`. The function stores it in `financial_audit_log.actor_profile_id` without deriving it from the service-role client.
+
+### 12.3 RLS Count
+
+- **15 RLS policies** on **6 EPF-02 water tables** (unchanged).
+- No new policies were added; the patch is function-level and execution-path only.
+
+### 12.4 Files Changed
+
+| # | File | Change |
+|---|---|---|
+| 1 | `supabase/migrations/20260724000000_sprint03_epf02r2_security_ledger_patch.sql` | New migration: patched `process_water_billing()` with service-role grants, tenant lock, latest ledger balance, direct audit attribution |
+| 2 | `supabase/functions/water-billing/index.ts` | Resolves `actor_profile_id` from authenticated context and passes it to the RPC |
+| 3 | `validation/epf02r2_security_ledger_tests.sql` | New validation suite for C-1 through C-5, idempotency, and rollback |
+| 4 | `docs/backend/41-epf02-executive-report.md` | This section |
+
+### 12.5 Validation Results
+
+| Check | Method | Expected Result |
+|---|---|---|
+| `authenticated` cannot execute `process_water_billing()` | `validation/epf02r2_security_ledger_tests.sql` | Permission denied |
+| `anon` cannot execute `process_water_billing()` | `validation/epf02r2_security_ledger_tests.sql` | Permission denied |
+| `service_role` execution succeeds | `validation/epf02r2_security_ledger_tests.sql` | Invoice, ledger, audit created |
+| Tenant lock acquired safely | `validation/epf02r2_security_ledger_tests.sql` | No overflow / no error |
+| Latest ledger balance used | `validation/epf02r2_security_ledger_tests.sql` | New balance = previous latest + amount |
+| Audit actor persisted | `validation/epf02r2_security_ledger_tests.sql` | `actor_profile_id` matches caller |
+| Idempotency | `validation/epf02r2_security_ledger_tests.sql` | `status: 'duplicate'` on retry |
+| Rollback on error | `validation/epf02r2_security_ledger_tests.sql` | No partial writes survive |
+| TypeScript | `npm run type-check` | Pass |
+| Build | `npm run build` | Pass |
+
+---
+
+*Date: 2026-07-24*
+*Next Step: EPF-02R2 final certification sign-off; then EPF-03 — Payment Processing*

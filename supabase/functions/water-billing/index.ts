@@ -6,6 +6,7 @@ interface RequestContext {
   authClient: SupabaseClient;
   adminClient: SupabaseClient;
   headers: Record<string, string>;
+  actorProfileId: string;
 }
 
 interface BillingExecuteInput {
@@ -68,7 +69,22 @@ async function buildRequestContext(request: Request): Promise<RequestContext | R
     );
   }
 
-  return { requestId, authClient, adminClient, headers };
+  // Resolve the authenticated actor profile id from the user JWT context.
+  // This is passed to process_water_billing so the financial audit record is
+  // attributed to the real operator, not derived from the service-role client.
+  const { data: actorProfileId, error: profileError } = await authClient.rpc('current_profile_id');
+  if (profileError || !actorProfileId) {
+    return new Response(
+      JSON.stringify({
+        data: null,
+        error: { code: 'NOT_FOUND', message: 'Perfil do operador nao encontrado.', requestId },
+        meta: { requestId, generatedAt: new Date().toISOString() },
+      }),
+      { status: 404, headers: { ...headers, 'Content-Type': 'application/json' } },
+    );
+  }
+
+  return { requestId, authClient, adminClient, headers, actorProfileId };
 }
 
 async function processBilling(
@@ -276,6 +292,7 @@ async function processMeter(
       p_meter_number: meterNumber,
       p_consumption: consumption,
       p_tariff_result: tariffData,
+      p_actor_profile_id: ctx.actorProfileId,
     },
   );
 
