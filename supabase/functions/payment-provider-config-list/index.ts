@@ -78,10 +78,10 @@ Deno.serve(async (request: Request) => {
       return jsonError(requestId, 'INTERNAL_ERROR', capabilitiesError.message, 500, { headers });
     }
 
-    // Fetch tenant configs (sanitized)
+    // Fetch tenant configs (sanitized). Vault secret UUIDs are mapped to booleans.
     let configsQuery = adminClient
       .from('tenant_payment_provider_configs')
-      .select('id, tenant_id, provider_id, environment, method_type, is_active, is_default, agreement_number, wallet, portfolio, bank_account, pix_keys, metadata, created_at, updated_at');
+      .select('id, tenant_id, provider_id, environment, method_type, is_active, is_default, agreement_number, wallet, portfolio, bank_account, pix_keys, metadata, created_at, updated_at, credentials_secret_id, webhook_secret_id');
     if (body.tenantId) {
       configsQuery = configsQuery.eq('tenant_id', body.tenantId);
     }
@@ -102,7 +102,25 @@ Deno.serve(async (request: Request) => {
         providerId: c.provider_id,
         capability: c.capability as PaymentProviderCapability,
       })),
-      configs: configs ?? [],
+      configs: (configs ?? []).map((c) => ({
+        id: c.id,
+        tenantId: c.tenant_id,
+        providerId: c.provider_id,
+        environment: c.environment,
+        methodType: c.method_type,
+        isActive: c.is_active,
+        isDefault: c.is_default,
+        agreementNumber: c.agreement_number,
+        wallet: c.wallet,
+        portfolio: c.portfolio,
+        bankAccount: c.bank_account,
+        pixKeys: c.pix_keys,
+        metadata: c.metadata,
+        createdAt: c.created_at,
+        updatedAt: c.updated_at,
+        hasCredentials: Boolean(c.credentials_secret_id),
+        hasWebhookSecret: Boolean(c.webhook_secret_id),
+      })),
     }, { headers });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Internal list error';

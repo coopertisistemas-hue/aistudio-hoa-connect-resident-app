@@ -4,6 +4,7 @@
 // Runtime capability discovery and enforcement.
 
 import type { PaymentProvider, PaymentProviderCapability, PaymentProviderId } from './types.ts';
+import { CapabilityNotSupportedError } from './types.ts';
 
 /**
  * All declared capabilities in the platform.

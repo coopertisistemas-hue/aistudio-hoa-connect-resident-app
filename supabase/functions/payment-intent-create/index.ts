@@ -1,8 +1,10 @@
 // Payment Intent Create Edge Function
-// EPF-03 Payment Processing Platform
+// EPF-03R Remediation
 //
 // Creates a payment intent for an invoice using the configured provider.
-// Supports PIX and Boleto. Updates invoice status and writes audit log.
+// The client must supply an idempotency key. The server validates the amount
+// against the outstanding invoice balance and avoids issuing multiple active
+// instruments whose combined amount exceeds the balance.
 
 import { type SupabaseClient } from 'npm:@supabase/supabase-js@2.57.4';
 import { buildCorsHeaders, jsonError, jsonOk, requestIdFromHeaders } from '../_shared/http.ts';
@@ -10,11 +12,13 @@ import { createConfiguredProvider } from '../_shared/payment/registry.ts';
 import { methodToCapability, requireCapability } from '../_shared/payment/capabilities.ts';
 import type { PaymentMethodType, PaymentProviderId, TenantProviderConfig } from '../_shared/payment/types.ts';
 import { createAuthClient, createAdminClient } from '../_shared/payment/crypto.ts';
+import type { RequestContext } from '../_shared/auth.ts';
 
 interface CreatePaymentIntentInput {
   invoiceId: string;
   method: PaymentMethodType;
   amount?: number;
+  idempotencyKey: string;
   providerConfigId?: string;
   environment?: 'sandbox' | 'production';
 }
@@ -57,7 +61,7 @@ async function resolveInvoice(
 ): Promise<{ invoice: Record<string, unknown>; tenantId: string } | Response> {
   const { data: invoice, error } = await ctx.authClient
     .from('invoices')
-    .select('id, tenant_id, billing_account_id, amount, status, due_date')
+    .select('id, tenant_id, billing_account_id, amount, status, due_date, currency')
     .eq('id', invoiceId)
     .single();
 
@@ -79,6 +83,7 @@ async function resolveProviderConfig(
       .select('*')
       .eq('id', input.providerConfigId)
       .eq('tenant_id', tenantId)
+      .eq('is_active', true)
       .single();
 
     if (error || !config) {
@@ -103,6 +108,7 @@ async function resolveProviderConfig(
     .from('tenant_payment_provider_configs')
     .select('*')
     .eq('id', config as string)
+    .eq('is_active', true)
     .single();
 
   if (!fullConfig) {
@@ -145,18 +151,21 @@ async function createIntent(
     requireCapability(provider, capability);
   }
 
+  const amount = input.amount ?? Number(invoice.amount);
+  const invoiceCurrency = (invoice.currency as string) ?? 'BRL';
+
   let providerResult;
   if (input.method === 'pix') {
     providerResult = await provider.createPix({
       invoiceId: input.invoiceId,
-      amount: input.amount ?? Number(invoice.amount),
+      amount,
       description: `Fatura ${invoice.id}`,
       expiresInMinutes: 30,
     });
   } else if (input.method === 'boleto') {
     providerResult = await provider.createBoleto({
       invoiceId: input.invoiceId,
-      amount: input.amount ?? Number(invoice.amount),
+      amount,
       description: `Fatura ${invoice.id}`,
       dueDate: String(invoice.due_date),
     });
@@ -180,11 +189,17 @@ async function createIntent(
     p_expires_at: providerResult.expiresAt ?? null,
     p_reconciliation_id: providerResult.reconciliationId,
     p_raw_provider_response: providerResult.rawProviderResponse ?? {},
-    p_idempotency_key: crypto.randomUUID(),
+    p_idempotency_key: input.idempotencyKey,
     p_actor_profile_id: ctx.actorProfileId,
   });
 
   if (rpcError || !intentId) {
+    if (rpcError?.message?.includes('Idempotency key reused with conflicting payload')) {
+      return jsonError(ctx.requestId, 'CONFLICT', 'Chave de idempotencia reutilizada com payload conflitante.', 409, { headers: ctx.headers });
+    }
+    if (rpcError?.message?.includes('exceeds remaining issuable balance')) {
+      return jsonError(ctx.requestId, 'VALIDATION_ERROR', `Valor excede saldo remanescente: ${rpcError.message}`, 422, { headers: ctx.headers });
+    }
     return jsonError(ctx.requestId, 'INTERNAL_ERROR', `Erro ao criar payment intent: ${rpcError?.message ?? 'unknown'}`, 500, { headers: ctx.headers });
   }
 
@@ -223,8 +238,12 @@ Deno.serve(async (request: Request) => {
     return jsonError(ctx.requestId, 'VALIDATION_ERROR', 'Invalid JSON body.', 422, { headers: ctx.headers });
   }
 
-  if (!body.invoiceId || !body.method) {
-    return jsonError(ctx.requestId, 'VALIDATION_ERROR', 'invoiceId and method are required.', 422, { headers: ctx.headers });
+  if (!body.invoiceId || !body.method || !body.idempotencyKey) {
+    return jsonError(ctx.requestId, 'VALIDATION_ERROR', 'invoiceId, method and idempotencyKey are required.', 422, { headers: ctx.headers });
+  }
+
+  if (body.idempotencyKey.length < 8) {
+    return jsonError(ctx.requestId, 'VALIDATION_ERROR', 'idempotencyKey must be at least 8 characters.', 422, { headers: ctx.headers });
   }
 
   const invoiceResult = await resolveInvoice(body.invoiceId, ctx);

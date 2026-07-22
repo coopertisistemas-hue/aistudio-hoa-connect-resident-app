@@ -1,12 +1,13 @@
 // Payment Provider Config Upsert Edge Function
-// EPF-03 Payment Processing Platform
+// EPF-03R Remediation
 //
 // Admin-only endpoint to create or update tenant provider configurations.
-// Credentials and webhook secrets are stored in Supabase Vault.
-// Only non-sensitive configuration is persisted in application tables.
+// Credentials and webhook secrets are stored in Supabase Vault inside the
+// atomic database RPC (resident.upsert_provider_config). The Edge Function
+// never returns raw Vault secret UUIDs to the frontend.
 
 import { buildCorsHeaders, jsonError, jsonOk, requestIdFromHeaders } from '../_shared/http.ts';
-import { createAdminClient, createAuthClient, createVaultSecret, updateVaultSecret } from '../_shared/payment/crypto.ts';
+import { createAdminClient, createAuthClient } from '../_shared/payment/crypto.ts';
 import type { PaymentMethodType, PaymentProviderEnvironment, PaymentProviderId } from '../_shared/payment/types.ts';
 
 interface UpsertProviderConfigInput {
@@ -68,106 +69,33 @@ Deno.serve(async (request: Request) => {
   }
 
   try {
-    // Resolve existing config to preserve secret ids
-    let credentialsSecretId: string | undefined;
-    let webhookSecretId: string | undefined;
+    const { data: result, error: rpcError } = await adminClient.rpc('upsert_provider_config', {
+      p_tenant_id: body.tenantId,
+      p_config_id: body.id ?? null,
+      p_provider_id: body.providerId,
+      p_environment: body.environment ?? 'sandbox',
+      p_method_type: body.methodType,
+      p_is_active: body.isActive ?? true,
+      p_is_default: body.isDefault ?? false,
+      p_agreement_number: body.agreementNumber ?? null,
+      p_wallet: body.wallet ?? null,
+      p_portfolio: body.portfolio ?? null,
+      p_bank_account: body.bankAccount ?? {},
+      p_pix_keys: body.pixKeys ?? {},
+      p_credentials: body.credentials ?? null,
+      p_webhook_secret: body.webhookSecret ?? null,
+      p_metadata: body.metadata ?? {},
+      p_actor_profile_id: null,
+    });
 
-    if (body.id) {
-      const { data: existing } = await adminClient
-        .from('tenant_payment_provider_configs')
-        .select('credentials_secret_id, webhook_secret_id')
-        .eq('id', body.id)
-        .single();
-
-      if (existing) {
-        credentialsSecretId = existing.credentials_secret_id as string | undefined;
-        webhookSecretId = existing.webhook_secret_id as string | undefined;
+    if (rpcError) {
+      if (rpcError.message.includes('unique_violation') || rpcError.message.includes('unique constraint')) {
+        return jsonError(requestId, 'CONFLICT', 'Ja existe uma configuracao padrao ativa para este metodo e ambiente.', 409, { headers });
       }
+      return jsonError(requestId, 'INTERNAL_ERROR', rpcError.message, 500, { headers });
     }
 
-    // Store/update credentials in Vault
-    if (body.credentials) {
-      if (credentialsSecretId) {
-        await updateVaultSecret(adminClient, credentialsSecretId, body.credentials);
-      } else {
-        const ref = await createVaultSecret(
-          adminClient,
-          body.credentials,
-          `provider-config-${body.providerId}-${body.tenantId}-credentials`,
-        );
-        credentialsSecretId = ref.id;
-      }
-    }
-
-    // Store/update webhook secret in Vault
-    if (body.webhookSecret) {
-      if (webhookSecretId) {
-        await updateVaultSecret(adminClient, webhookSecretId, body.webhookSecret);
-      } else {
-        const ref = await createVaultSecret(
-          adminClient,
-          body.webhookSecret,
-          `provider-config-${body.providerId}-${body.tenantId}-webhook`,
-        );
-        webhookSecretId = ref.id;
-      }
-    }
-
-    // Upsert config row (without sensitive values)
-    const configRow = {
-      tenant_id: body.tenantId,
-      provider_id: body.providerId,
-      environment: body.environment ?? 'sandbox',
-      method_type: body.methodType,
-      is_active: body.isActive ?? true,
-      is_default: body.isDefault ?? false,
-      agreement_number: body.agreementNumber ?? null,
-      wallet: body.wallet ?? null,
-      portfolio: body.portfolio ?? null,
-      bank_account: body.bankAccount ?? {},
-      pix_keys: body.pixKeys ?? {},
-      credentials_secret_id: credentialsSecretId ?? null,
-      webhook_secret_id: webhookSecretId ?? null,
-      metadata: body.metadata ?? {},
-    };
-
-    const { data: upserted, error: upsertError } = body.id
-      ? await adminClient
-        .from('tenant_payment_provider_configs')
-        .update(configRow)
-        .eq('id', body.id)
-        .select()
-        .single()
-      : await adminClient
-        .from('tenant_payment_provider_configs')
-        .insert(configRow)
-        .select()
-        .single();
-
-    if (upsertError || !upserted) {
-      return jsonError(requestId, 'INTERNAL_ERROR', upsertError?.message ?? 'Erro ao salvar configuracao.', 500, { headers });
-    }
-
-    // Return sanitized config
-    return jsonOk(requestId, {
-      config: {
-        id: upserted.id,
-        tenantId: upserted.tenant_id,
-        providerId: upserted.provider_id,
-        environment: upserted.environment,
-        methodType: upserted.method_type,
-        isActive: upserted.is_active,
-        isDefault: upserted.is_default,
-        agreementNumber: upserted.agreement_number,
-        wallet: upserted.wallet,
-        portfolio: upserted.portfolio,
-        bankAccount: upserted.bank_account,
-        pixKeys: upserted.pix_keys,
-        credentialsSecretId: upserted.credentials_secret_id,
-        webhookSecretId: upserted.webhook_secret_id,
-        metadata: upserted.metadata,
-      },
-    }, { headers });
+    return jsonOk(requestId, { config: result }, { headers });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Internal config error';
     return jsonError(requestId, 'INTERNAL_ERROR', message, 500, { headers });

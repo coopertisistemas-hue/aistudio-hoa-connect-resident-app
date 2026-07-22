@@ -1,7 +1,8 @@
 // Payment Intent Cancel Edge Function
-// EPF-03 Payment Processing Platform
+// EPF-03R Remediation
 //
-// Cancels a pending payment intent through the provider and updates status.
+// Cancels a pending or processing payment intent through the provider and
+// finalizes the database state atomically via cancel_payment_intent.
 
 import { buildCorsHeaders, jsonError, jsonOk, requestIdFromHeaders } from '../_shared/http.ts';
 import { createAdminClient, createAuthClient } from '../_shared/payment/crypto.ts';
@@ -65,31 +66,33 @@ Deno.serve(async (request: Request) => {
     const { data: configRow } = await adminClient
       .from('tenant_payment_provider_configs')
       .select('*')
-      .eq('id', intent.provider_config_id)
+      .eq('id', intent.provider_config_id as string)
+      .eq('tenant_id', intent.tenant_id as string)
+      .eq('is_active', true)
       .single();
 
+    let providerResponse: Record<string, unknown> = {};
     if (configRow) {
       const config = mapConfig(configRow);
       const provider = createConfiguredProvider(config);
-      await provider.cancel(intent.provider_payment_intent_id as string);
+      providerResponse = await provider.cancel(intent.provider_payment_intent_id as string);
+    } else {
+      return jsonError(requestId, 'NOT_FOUND', 'Configuracao do provedor nao encontrada.', 404, { headers });
     }
 
-    const { error: updateError } = await adminClient
-      .from('payment_intents')
-      .update({ status: 'cancelled', updated_at: new Date().toISOString() })
-      .eq('id', body.paymentIntentId);
+    // Atomic database finalization.
+    const { data: result, error: rpcError } = await adminClient.rpc('cancel_payment_intent', {
+      p_tenant_id: intent.tenant_id as string,
+      p_payment_intent_id: body.paymentIntentId,
+      p_provider_response: providerResponse,
+      p_actor_profile_id: null,
+    });
 
-    if (updateError) {
-      return jsonError(requestId, 'INTERNAL_ERROR', updateError.message, 500, { headers });
+    if (rpcError) {
+      return jsonError(requestId, 'INTERNAL_ERROR', rpcError.message, 500, { headers });
     }
 
-    const { data: updated } = await adminClient
-      .from('payment_intents')
-      .select('*')
-      .eq('id', body.paymentIntentId)
-      .single();
-
-    return jsonOk(requestId, { paymentIntent: updated }, { headers });
+    return jsonOk(requestId, { result }, { headers });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Internal cancel error';
     return jsonError(requestId, 'INTERNAL_ERROR', message, 500, { headers });
